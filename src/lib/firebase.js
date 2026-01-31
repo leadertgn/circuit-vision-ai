@@ -12,5 +12,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+if(app) console.log("Firebase initialisé !!")
 export const db = getFirestore(app);
 export const storage = getStorage(app); // <--- AJOUTE CELA

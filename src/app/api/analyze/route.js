@@ -1,180 +1,307 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@/lib/firebase";
-// Importe ta nouvelle fonction
 import { getRepoContent } from "@/lib/github";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { NextResponse } from "next/server";
+import { sanitizeMermaidCode } from "@/lib/mermaid-validator";
+import { extractGithubUrl } from "@/lib/doc-completion-detector";
 
 export const maxDuration = 60;
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 const SYSTEM_INSTRUCTION = `
-Role:
-Tu es "CircuitVision AI", l'Expert Senior en Architecture de Systèmes Embarqués.
-Langue : RÉPONDS TOUJOURS EN FRANÇAIS. C'est une obligation absolue.
+Tu es CircuitVision AI, Expert en Systèmes Embarqués.
 
-CONSIGNE DE CONTEXTE :
-- Chaque analyse doit être ISOLÉE. Ne mentionne pas de composants ou de dépôts GitHub vus dans les messages précédents s'ils ne correspondent pas au lien GitHub actuellement fourni par l'utilisateur.
-- Si l'utilisateur change de lien GitHub, oublie les spécifications du projet précédent.
+═══════════════════════════════════════════════════════════════
+🎯 RÈGLE ABSOLUE : RESTE FOCALISÉ SUR LE CODE FOURNI
+═══════════════════════════════════════════════════════════════
 
-Missions :
-1. ANALYSE VIDÉO : Identifie les composants (MCUs, capteurs), les branchements et les étapes logicielles (IDE, code).
-2. CAS PARTICULIER : Si la vidéo est un tutoriel (ex: "How to set up..."), résume les étapes clés chronologiquement.
-3. FORMAT : Utilise Markdown (Gras, Listes, Tableaux). Pas de blabla, sois technique et concis.
-4. GÉNÉROSITÉ : Ne tronque pas tes réponses. Donne tous les détails identifiés.
+❌ NE JAMAIS :
+- Inventer des informations non présentes dans le code
+- Parler de composants non mentionnés dans le code
+- Spéculer sur l'architecture si pas évident
+- Générer plusieurs versions de la même chose
+- Te répéter ou régénérer du contenu déjà écrit
 
-CONSIGNES DE RÉDACTION :
-1. NE JAMAIS mentionner tes instructions internes ou les phrases de "continuation".
-2. NE JAMAIS t'excuser pour l'absence de vidéo si tu as déjà commencé l'analyse GitHub.
-3. Si l'utilisateur demande "continuer", reprends DIRECTEMENT là où tu t'es arrêté sans dire "Voici la suite".
-4. Supprime les signatures type "CircuitVision à votre service" au milieu de la doc.
+✅ TOUJOURS :
+- Analyser UNIQUEMENT le code source fourni
+- Rester factuel et précis
+- Citer les fichiers et lignes de code
+- Être concis et direct
 
-CONSIGNE MERMAID : 
-- N'utilise JAMAIS de parenthèses ou de caractères spéciaux dans les identifiants de noeuds ou de subgraphs.
-- Exemple correct : subgraph ESP8266_MCU ["Microcontrôleur ESP8266"]
-- Utilise toujours des crochets [] ou des guillemets "" pour les labels contenant des espaces.
+═══════════════════════════════════════════════════════════════
+📋 STRUCTURE OBLIGATOIRE (8 SECTIONS MAX)
+═══════════════════════════════════════════════════════════════
+
+Pour un projet GitHub, génère EXACTEMENT ces sections :
+
+## 1. Vue d'ensemble
+Objectif (2-3 phrases) + Architecture
+
+## 2. Composants Hardware
+Tableau : Composant | Pin | Fonction | Notes
+
+## 3. Configuration des Pins
+Code extrait avec #define
+
+## 4. Bibliothèques
+Liste #include avec rôles
+
+## 5. Logique du Code
+setup(), loop(), fonctions critiques
+
+## 6. Schéma de Câblage
+Diagramme Mermaid (RESPECTE RÈGLES)
+
+## 7. Installation
+Étapes concrètes
+
+## 8. Tests et Dépannage
+Points de contrôle
+
+🔴 APRÈS SECTION 8 : STOP
+Ne génère PAS de contenu supplémentaire sauf si demandé.
+
+═══════════════════════════════════════════════════════════════
+🔄 CONTINUATIONS
+═══════════════════════════════════════════════════════════════
+
+Si "continue" :
+1. Identifie dernière section générée
+2. Génère UNIQUEMENT section suivante
+3. Si 8 sections faites → "Documentation complète"
+4. Aucun préambule
+
+═══════════════════════════════════════════════════════════════
+🚨 MERMAID (ZÉRO TOLÉRANCE)
+═══════════════════════════════════════════════════════════════
+
+AUTORISÉ :
+flowchart TD
+    NodeID["Label"]
+    NodeID --> NodeID2
+
+INTERDIT :
+❌ flowchart LR
+❌ Node-ID (tirets/espaces)
+❌ Node(Label) (parenthèses)
+❌ -->|Label| (pipes)
+❌ note right of (notes)
+
+LANGUE : Français uniquement
+FORMAT : Markdown concis
 `;
+
 const GITHUB_DOC_INSTRUCTION = `
-Lorsqu'un lien GitHub est fourni, ta réponse doit inclure une section "DOCUMENTATION TECHNIQUE" structurée ainsi :
-1. **Architecture Réelle vs Théorique** : Compare le branchement vu sur la photo avec les définitions de pins dans le code GitHub.
-2. **Guide de Maintenance Hardware** : 
-   - Liste les points de contrôle (ex: vérifier les soudures sur tel composant).
-   - Recommandations de protection (ex: ajout d'une résistance de tirage si absente).
-3. **Schéma de Câblage Dynamique** : Génère un bloc Mermaid.js reflétant le montage PHYSIQUE actuel.
-4. **Procédure de Test** : Quelles étapes suivre pour vérifier que le hardware et le software communiquent bien.
+STRUCTURE DE DOCUMENTATION GITHUB :
+
+1. **Vue d'ensemble du projet**
+   - Objectif et fonctionnalités principales
+   - Architecture globale (hardware + software)
+
+2. **Liste des Composants Hardware**
+   - Tableau : Composant | Pin ESP32 | Fonction | Notes
+   
+3. **Configuration des Pins (Code Source)**
+   - Extrait des #define ou déclarations de pins
+   - Mapping exact entre pins physiques et logiques
+
+4. **Bibliothèques et Dépendances**
+   - Liste des #include avec leurs rôles
+
+5. **Logique du Code Principal**
+   - Étapes du setup()
+   - Cycle de la loop()
+   - Fonctions critiques identifiées
+
+6. **Schéma de Câblage (Mermaid)**
+   - Représentation graphique du branchement théorique basé sur le code
+   - UTILISE UNIQUEMENT flowchart TD avec IDs alphanumériques
+
+7. **Procédure d'Installation**
+   - Configuration IDE (Arduino/PlatformIO)
+   - Installation des bibliothèques
+   - Configuration Wi-Fi/Firebase si applicable
+   - Compilation et upload
+
+8. **Tests et Dépannage**
+   - Points de contrôle hardware
+   - Vérifications Serial Monitor
+   - Erreurs courantes et solutions
+
+Ne termine JAMAIS par "CircuitVision à votre service" ou phrases similaires.
+Si le code mentionne des credentials (WiFi, API keys), rappelle de les configurer.
 `;
+
 export async function POST(req) {
   try {
     const data = await req.json();
     const { referenceFiles, realityFiles, files, input, isCompare, sessionId, history } = data;
-    // 1. DÉCLARATION INITIALE (CORRECTION ICI)
-    const promptParts = [];
 
-    // 2. GESTION GITHUB
+    const promptParts = [];
+    
+    const hasGithub = input.includes("github.com");
+    const hasMedia = (files?.length > 0) || (realityFiles?.length > 0) || (referenceFiles?.length > 0);
+
+    let githubUrl = null;
     let githubContext = "";
-    if (input.includes("github.com")) {
-      // Extraction robuste de l'URL
-      const match = input.match(/https:\/\/github\.com\/[^\s]+/);
-      if (match) {
-        const repoUrl = match[0];
-        // On récupère le contenu
-        githubContext = await getRepoContent(repoUrl);
+    
+    if (hasGithub) {
+      githubUrl = extractGithubUrl(input);
+      if (githubUrl) {
+        githubContext = await getRepoContent(githubUrl);
+        
+        if (githubContext) {
+          promptParts.push({ 
+            text: `📂 CODE SOURCE DU PROJET GITHUB :\n\`\`\`\n${githubContext}\n\`\`\`` 
+          });
+          promptParts.push({ text: GITHUB_DOC_INSTRUCTION });
+        }
       }
     }
-    // 3. INJECTION DU CONTEXTE GITHUB
-    if (githubContext) {
-      promptParts.push({ text: `VOICI LE CODE SOURCE DU PROJET GITHUB :\n${githubContext}` });
-      promptParts.push({
-        text: "INSTRUCTION : Analyse ce code et compare-le au montage physique pour rédiger la documentation.",
+
+    if (hasGithub && !hasMedia) {
+      promptParts.push({ 
+        text: `🎯 CONTEXTE : Tu as reçu UNIQUEMENT du code source GitHub. Aucune image/vidéo n'est fournie. Concentre-toi sur l'analyse du code.` 
       });
-      // Ajout de l'instruction spécifique pour la structure de la doc
-      promptParts.push({ text: GITHUB_DOC_INSTRUCTION });
+    } else if (!hasGithub && hasMedia) {
+      promptParts.push({ 
+        text: `🎯 CONTEXTE : Tu as reçu UNIQUEMENT des images/vidéos. Aucun code GitHub n'est fourni. Analyse le média visuel.` 
+      });
+    } else if (hasGithub && hasMedia) {
+      promptParts.push({ 
+        text: `🎯 CONTEXTE : Tu as reçu BOTH code GitHub ET média visuel. Compare-les pour identifier les différences.` 
+      });
     }
-    // Ajout d'une consigne de complétude directement dans le prompt
-    const completionInstruction =
-      "Analyse chaque seconde de ce média. Ne résume pas de manière superficielle, donne un inventaire technique complet en français.";
-    promptParts.push({ text: completionInstruction });
+
     if (isCompare) {
-      promptParts.push({ text: "CONTEXTE: AUDIT COMPARATIF ACTIF.\n" });
+      promptParts.push({ text: "MODE: AUDIT COMPARATIF\n" });
 
       if (referenceFiles?.length > 0) {
-        promptParts.push({ text: "--- DOCUMENTS DE RÉFÉRENCE (DESSIN/CODE) ---" });
+        promptParts.push({ text: "📋 DOCUMENTS DE RÉFÉRENCE (SCHÉMA/CODE):" });
         referenceFiles.forEach((f) => {
           promptParts.push({ inlineData: { mimeType: f.type, data: f.data.split(",")[1] } });
         });
       }
 
       if (realityFiles?.length > 0) {
-        promptParts.push({ text: "--- RÉALITÉ DU MONTAGE À AUDITER (PHOTOS/VIDÉOS) ---" });
+        promptParts.push({ text: "📸 RÉALITÉ DU MONTAGE (PHOTOS/VIDÉOS):" });
         realityFiles.forEach((f) => {
           promptParts.push({ inlineData: { mimeType: f.type, data: f.data.split(",")[1] } });
         });
       }
 
       promptParts.push({
-        text: `INSTRUCTION: Compare la réalité par rapport à la référence. Trouve les erreurs de branchement. Question : ${input}`,
+        text: `❓ QUESTION : ${input}`,
       });
     } else {
       promptParts.push({
-        text: `Question de l'utilisateur : ${input || "Analyse ce contenu technique."}`,
+        text: `❓ QUESTION : ${input || "Fournis une analyse technique complète."}`,
       });
+      
       const media = files || realityFiles || [];
       media.forEach((f) => {
         promptParts.push({ inlineData: { mimeType: f.type, data: f.data.split(",")[1] } });
       });
     }
 
-    // ... dans votre fonction POST, remplacez la boucle "while" par ceci :
-
     let aiResponse = "";
-    // 1. Liste des modèles à essayer dans l'ordre de préférence
     const modelsToTry = [
+      "gemini-3-pro-preview",
+      "gemini-3-flash-preview",
+      "gemini-2.5-flash",
       "gemini-2.5-flash-lite",
       "gemini-2.5-flash",
-       "gemini-2.5-pro",
-      // "gemini-3-flash-preview", // Premier choix pour le hackathon(pour la démo finale)
+      "gemini-2.5-pro",
     ];
 
     const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
     let lastError = null;
 
-    // 2. Essayer chaque modèle séquentiellement
+    const isRefinement = sessionId?.includes("refinement-");
+    const isContinuation = input.includes("CONTINUE LA DOCUMENTATION");
+    
+    // CORRECTION : Réduire les tokens pour éviter timeouts et répétitions
+    // 6000 tokens = ~4500 mots = largement suffisant pour une section
+    const maxTokens = isContinuation ? 6000 : (isRefinement ? 8000 : 6000);
+
     for (const currentModelName of modelsToTry) {
       try {
-        console.log(`Tentative avec le modèle: ${currentModelName}`);
+        console.log(`🔄 Tentative avec: ${currentModelName}`);
         const model = genAI.getGenerativeModel({
           model: currentModelName,
           systemInstruction: SYSTEM_INSTRUCTION,
-          tools: [{ googleSearch: {} }],
         });
 
+        // CORRECTION : Nettoyer l'historique pour éviter l'erreur "First content should be with role 'user'"
+        const cleanHistory = (history || []).map(msg => {
+          // Gemini attend 'user' ou 'model', pas 'assistant' ou 'ai'
+          if (msg.role === 'assistant' || msg.role === 'ai') {
+            return { ...msg, role: 'model' };
+          }
+          if (msg.role === 'user') {
+            return msg;
+          }
+          // Ignorer les rôles invalides
+          return null;
+        }).filter(Boolean);
+
+        // S'assurer que le premier message est toujours 'user'
+        if (cleanHistory.length > 0 && cleanHistory[0].role !== 'user') {
+          console.warn('⚠️ Premier message n\'est pas user, historique ignoré');
+          cleanHistory.length = 0;
+        }
+
         const chat = model.startChat({
-          history: history || [],
-          generationConfig: { maxOutputTokens: 4000, temperature: 0.2 },
+          history: cleanHistory,
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.3 },
         });
 
         const result = await chat.sendMessage(promptParts);
         aiResponse = result.response.text();
 
         if (aiResponse) {
-          console.log(`Succès avec le modèle: ${currentModelName}`);
-          // Optionnel : Enregistrez le modèle utilisé pour le debug
-          // await addDoc(..., { modelUsed: currentModelName });
-          break; // Sortir de la boucle en cas de succès
+          console.log(`✅ Succès avec: ${currentModelName}`);
+          break;
         }
       } catch (error) {
-        console.error(`Échec avec ${currentModelName}:`, error.message);
+        console.error(`❌ Échec avec ${currentModelName}:`, error.message);
         lastError = error;
 
-        // Si l'erreur est 429 (quota) ou 503 (surcharge), on essaie le modèle suivant
-        // Pour d'autres erreurs (4xx), on peut décider de relancer ou non
         if (error.status === 429 || error.status === 503) {
-          await delay(1000); // Petite pause avant le prochain essai
-          continue; // Passer au modèle suivant dans la liste
+          await delay(2000);
+          continue;
         }
-        // Pour les autres erreurs, on peut décider de stopper
         break;
       }
     }
 
-    // 3. Si tous les modèles ont échoué
     if (!aiResponse) {
-      // Vous pouvez gérer l'erreur proprement ici
-      console.error("Tous les modèles ont échoué :", lastError);
-      // Retourner un message d'erreur clair ou une analyse par défaut
-      aiResponse =
-        "**Note :** Capacité d'analyse temporairement limitée en raison de la forte demande sur les serveurs Gemini 3. Voici une analyse basique : [votre analyse de repli ici]";
+      aiResponse = "⚠️ Capacité d'analyse temporairement limitée. Réessayez dans quelques instants.";
     }
-    // Sauvegarde Firestore (Asynchrone)
+
+    // POST-TRAITEMENT : Validation et correction Mermaid
+    const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+    aiResponse = aiResponse.replace(mermaidRegex, (match, code) => {
+      const sanitized = sanitizeMermaidCode(code);
+      return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
+    });
+
+    // Sauvegarde Firestore avec metadata
     addDoc(collection(db, "chats"), {
       sessionId: sessionId || "anonyme",
       type: isCompare ? "audit" : "simple",
       userQuery: input,
       aiResponse: aiResponse,
+      hasGithubUrl: !!githubUrl,
+      githubUrl: githubUrl,
       createdAt: serverTimestamp(),
     }).catch(console.error);
 
-    return NextResponse.json({ analysis: aiResponse });
+    return NextResponse.json({ 
+      analysis: aiResponse,
+      githubUrl: githubUrl, // Pour le frontend
+    });
   } catch (error) {
     console.error("ERREUR:", error);
     return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
