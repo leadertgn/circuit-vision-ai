@@ -15,6 +15,7 @@ import {
   Copy,
   Check,
   Github,
+  FileVideo
 } from "lucide-react";
 import jsPDF from "jspdf";
 import ReactMarkdown from "react-markdown";
@@ -75,8 +76,6 @@ export default function Home() {
   const sessionId = getSessionId();
 
   // Hook pour détecter si on doit afficher le bouton GitHub
-
-
   const { shouldShowButton, githubUrl, documentationContent } = useGithubDocButton(messages, activeChatId);
 
   // --- EFFETS (Firebase) ---
@@ -138,7 +137,7 @@ export default function Home() {
       })
       .filter((t) => t.length > 0)
       .join("\n\n---\n\n");
-  };
+  }; 
 
   const handleRefineAndPush = async (url) => {
     setLoading(true);
@@ -660,37 +659,107 @@ COMMENCE MAINTENANT :`;
                 </div>
               </div>
             )}
-            <div className="flex items-end gap-2 bg-slate-100 rounded-[2rem] p-2 border border-slate-200">
-              {!isCompareMode && (
-                <button
-                  onClick={() => fileInputRef.current.click()}
-                  className="p-3 text-slate-400 hover:text-blue-600 transition-colors"
-                >
-                  <Paperclip size={22} />
-                </button>
+
+            {/* Zone de saisie principale avec prévisualisation des fichiers */}
+            <div className="flex flex-col bg-slate-100 rounded-[2rem] border border-slate-200 transition-all focus-within:ring-2 focus-within:ring-blue-100">
+              
+              {/* Zone de prévisualisation des fichiers */}
+              {(isCompareMode ? realAttachments.length > 0 : realAttachments.length > 0) && (
+                <div className="flex gap-3 p-3 overflow-x-auto border-b border-slate-200/50">
+                  {realAttachments.map((file, index) => (
+                    <div key={index} className="relative group shrink-0">
+                      {/* Affichage conditionnel : Image ou Icône Vidéo */}
+                      {file.type.startsWith("image") ? (
+                        <img
+                          src={file.data}
+                          alt="preview"
+                          className="w-16 h-16 object-cover rounded-lg border border-slate-300 bg-white"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 flex items-center justify-center bg-slate-200 rounded-lg border border-slate-300">
+                          <FileVideo size={20} className="text-slate-500" />
+                        </div>
+                      )}
+
+                      {/* Bouton Supprimer (X) */}
+                      <button
+                        onClick={() => {
+                          setRealAttachments(prev => prev.filter((_, i) => i !== index));
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm transition-transform hover:scale-110"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {isCompareMode && refAttachments.map((file, index) => (
+                    <div key={`ref-${index}`} className="relative group shrink-0">
+                      {file.type.startsWith("image") ? (
+                        <img
+                          src={file.data}
+                          alt="preview"
+                          className="w-16 h-16 object-cover rounded-lg border border-orange-300 bg-white"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 flex items-center justify-center bg-orange-100 rounded-lg border border-orange-300">
+                          <FileText size={20} className="text-orange-500" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setRefAttachments(prev => prev.filter((_, i) => i !== index));
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm transition-transform hover:scale-110"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
-              <input
-                type="file"
-                multiple
-                ref={fileInputRef}
-                className="hidden"
-                onChange={(e) => handleUpload(e, "real")}
-              />
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder={isCompareMode ? "Décrivez le problème..." : "Analysez mon circuit..."}
-                className="flex-1 bg-transparent border-none focus:ring-0 p-3 text-sm resize-none min-h-[44px]"
-                rows="1"
-              />
-              <button
-                onClick={() => sendMessage()}
-                disabled={loading}
-                className="bg-blue-600 text-white p-4 rounded-2xl hover:bg-blue-700 disabled:opacity-50 shadow-lg"
-              >
-                <Send size={18} />
-              </button>
+
+              <div className="flex items-end gap-2 p-2">
+                {!isCompareMode && (
+                  <button
+                    onClick={() => fileInputRef.current.click()}
+                    className="p-3 text-slate-400 hover:text-blue-600 transition-colors rounded-full hover:bg-slate-200"
+                    title="Ajouter une image ou vidéo"
+                  >
+                    <Paperclip size={22} />
+                  </button>
+                )}
+                
+                <input
+                  type="file"
+                  multiple
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={(e) => handleUpload(e, "real")}
+                  accept="image/*,video/*,application/pdf"
+                />
+
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                  placeholder={
+                    isCompareMode
+                      ? "Décrivez le problème sur ce montage..."
+                      : "Analysez mon circuit (Collez une image, vidéo ou code)..."
+                  }
+                  className="flex-1 bg-transparent border-none focus:ring-0 p-3 text-sm resize-none min-h-[44px] max-h-[150px]"
+                  rows="1"
+                  style={{ minHeight: '44px' }}
+                />
+
+                <button
+                  onClick={() => sendMessage()}
+                  disabled={loading || (!input.trim() && realAttachments.length === 0 && refAttachments.length === 0)}
+                  className="bg-blue-600 text-white p-3 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-200 mb-1"
+                >
+                  <Send size={18} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
