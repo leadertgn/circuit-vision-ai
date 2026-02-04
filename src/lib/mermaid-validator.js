@@ -33,6 +33,12 @@ export function sanitizeMermaidCode(rawCode) {
   code = code.replace(/\['\)/g, "']");
   code = code.replace(/\('\]/g, "['");
   
+  // Correction agressive: tout pattern [quelque chose) doit devenir [quelque chose]
+  // GPIO_LED["Broche GPIO[LED)"] --> GPIO_LED["Broche GPIO[LED]"]
+  code = code.replace(/\[([^\]]+)\)/g, (match, content) => {
+    return `[${content}]`;
+  });
+  
   // 5. Corriger les IDs avec parenthèses (Node() → Node)
   code = code.replace(/(\w+)\s*\(/g, (match, id) => {
     // Si c'est suivi d'un crochet, c'est probablement un nœud
