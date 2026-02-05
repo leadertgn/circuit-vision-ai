@@ -42,8 +42,13 @@ export default function AnalyticsDashboard({ sessionId }) {
 
       // Calculs des métriques
       const totalAnalyses = chats.length;
-      const totalBugsFound = chats.reduce((sum, chat) => sum + (chat.bugsDetected || 0), 0);
-      const totalComponents = chats.reduce((sum, chat) => sum + (chat.componentCount || 0), 0);
+const totalBugsFound = chats.reduce((sum, chat) => {
+  if (chat.bugsDetected && chat.bugsDetected.stats) {
+    return sum + (chat.bugsDetected.stats.total || 0);
+  }
+  return sum;
+}, 0);     
+ const totalComponents = chats.reduce((sum, chat) => sum + (chat.componentCount || 0), 0);
       const githubCommits = chats.filter((chat) => chat.hasGithubUrl).length;
 
       // Temps moyen d'analyse (estimé à 25s par analyse avec notre IA)

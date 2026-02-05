@@ -1,4 +1,5 @@
-// hooks/useGithubDocButton.js
+// REMPLACER src/hooks/useGithubDocButton.js entièrement par :
+
 import { useState, useEffect } from "react";
 import { isDocumentationComplete } from "@/lib/doc-completion-detector";
 
@@ -13,7 +14,7 @@ export function useGithubDocButton(messages, activeChatId) {
       return;
     }
 
-    // Chercher la dernière réponse AI avec un lien GitHub
+    // Filtrer messages AI et utilisateur
     const aiMessages = messages.filter((m) => m.role === "assistant");
     const userMessages = messages.filter((m) => m.role === "user");
 
@@ -22,10 +23,10 @@ export function useGithubDocButton(messages, activeChatId) {
       return;
     }
 
-    // Trouver le dernier message utilisateur avec GitHub URL
+    // Trouver dernière URL GitHub dans messages utilisateur
     let detectedGithubUrl = null;
     for (let i = userMessages.length - 1; i >= 0; i--) {
-      // Utiliser 'text' au lieu de 'content' (propriété correcte)
+      // ✅ CORRECTION : Utiliser .text pas .content
       const match = userMessages[i].text?.match(/https:\/\/github\.com\/[^\s]+/);
       if (match) {
         detectedGithubUrl = match[0];
@@ -33,13 +34,14 @@ export function useGithubDocButton(messages, activeChatId) {
       }
     }
 
-    // Vérifier la dernière réponse AI
+    // Vérifier dernière réponse AI
     const lastAiMessage = aiMessages[aiMessages.length - 1];
     const lastUserMessage = userMessages[userMessages.length - 1];
 
-    // Ne pas afficher si l'utilisateur a dit "continue"
+    // Ne pas afficher si continuation
     const isContinuation = lastUserMessage?.text?.toLowerCase().includes("continue");
 
+    // ✅ CORRECTION : Utiliser .text pour vérifier completion
     if (detectedGithubUrl && !isContinuation && isDocumentationComplete(lastAiMessage.text)) {
       setShouldShowButton(true);
       setGithubUrl(detectedGithubUrl);
@@ -54,6 +56,7 @@ export function useGithubDocButton(messages, activeChatId) {
   return {
     shouldShowButton,
     githubUrl,
-    documentationContent: documentationMessage?.content,
+    // ✅ CORRECTION : Utiliser .text pas .content
+    documentationContent: documentationMessage?.text,
   };
 }

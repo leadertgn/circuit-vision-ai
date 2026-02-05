@@ -296,88 +296,116 @@ export default function Home() {
     }
   };
 
-  const handleStreamingResponse = async (response, chatId) => {
-    console.log("handleStreamingResponse started");
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let accumulatedText = "";
+// REMPLACER la fonction handleStreamingResponse (ligne 149-201) par :
 
-    const tempMsgRef = await addDoc(collection(db, "conversations", chatId, "messages"), {
-      role: "assistant",
-      text: "",
-      isStreaming: true,
-      createdAt: serverTimestamp(),
-    });
+const handleStreamingResponse = async (response, chatId) => {
+  console.log("🔄 Streaming started");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let accumulatedText = "";
+  let bugsData = null;
+  let shoppingData = null;
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          console.log("Streaming done");
-          break;
+  // Créer message temporaire
+  const tempMsgRef = await addDoc(collection(db, "conversations", chatId, "messages"), {
+    role: "assistant",
+    text: "",
+    isStreaming: true,
+    createdAt: serverTimestamp(),
+  });
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        console.log("✅ Streaming complete");
+        break;
+      }
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        // Gérer les events SSE
+        if (line.startsWith("event: ")) {
+          const eventType = line.slice(7).trim();
+          console.log("📡 Event:", eventType);
+          continue;
         }
 
-        const chunk = decoder.decode(value);
-        console.log("Chunk received:", chunk);
-        const lines = chunk.split("\n");
+        // Gérer les data SSE
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6));
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log("Data event:", data.event, data.text ? data.text.substring(0, 50) : "");
+            // Streaming du texte
+            if (data.text) {
+              accumulatedText += data.text;
+              await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+                text: accumulatedText,
+              });
+            }
 
-              if (data.text) {
-                accumulatedText += data.text;
-                await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
-                  text: accumulatedText,
-                });
-              }
+            // Bugs détectés
+            if (data.bugs && data.bugs.length > 0) {
+              bugsData = data;
+              console.log("🐛 Bugs détectés:", data.bugs.length);
+              // Afficher notification ou badge
+            }
 
-              if (data.event === "complete") {
-                console.log("Streaming complete");
-                await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
-                  isStreaming: false,
-                  ...(data.data?.githubUrl && { githubUrl: data.data.githubUrl }),
-                  ...(data.data?.metadata?.bugsFound !== undefined && {
-                    bugsFound: data.data.metadata.bugsFound,
-                  }),
-                  ...(data.data?.metadata?.componentsFound !== undefined && {
-                    componentsFound: data.data.metadata.componentsFound,
-                  }),
-                });
-
-                // Générer un titre pour la conversation
-                try {
-                  const titleRes = await fetch("/api/generate-title", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      chatId,
-                      aiFirstResponse: accumulatedText,
-                    }),
-                  });
-                  const titleData = await titleRes.json();
-                  console.log("Title generated:", titleData.title);
-                } catch (titleError) {
-                  console.error("Erreur génération titre:", titleError);
-                }
-
-                if (data.data?.metadata?.componentsFound > 0) {
-                  setSimulatorData({ code: accumulatedText, components: [] });
-                  setShowSimulator(true);
-                }
-              }
-            } catch (e) {
-              console.error("Parse error:", e);
+            // Shopping list
+            if (data.items && data.items.length > 0) {
+              shoppingData = data;
+              console.log("🛒 Composants:", data.items.length);
+            }
+          } catch (e) {
+            // Ignorer les lignes invalides
+            if (line.trim() !== "") {
+              console.warn("⚠️ Parse error:", e.message);
             }
           }
         }
       }
-    } catch (error) {
-      console.error("Streaming error:", error);
     }
-  };
+
+    // Finaliser le message
+    await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+      isStreaming: false,
+      bugsFound: bugsData?.bugs?.length || 0,
+      componentsFound: shoppingData?.items?.length || 0,
+    });
+
+    // Générer titre conversation
+    if (accumulatedText.length > 50) {
+      fetch("/api/generate-title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatId,
+          aiFirstResponse: accumulatedText.substring(0, 300),
+        }),
+      }).catch(console.error);
+    }
+
+    // Activer simulateur si composants détectés
+    if (shoppingData && shoppingData.items.length > 0) {
+      setSimulatorData({
+        code: accumulatedText,
+        components: shoppingData.items.map((item) => ({
+          component: item.component,
+          pin: "GPIO" + Math.floor(Math.random() * 30),
+        })),
+      });
+      setShowSimulator(true);
+    }
+  } catch (error) {
+    console.error("❌ Streaming error:", error);
+    await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+      text: accumulatedText || "Erreur lors du streaming",
+      isStreaming: false,
+    });
+  }
+};
 
   const resetConversation = () => {
     if (confirm("Démarrer un nouveau projet ?")) {
