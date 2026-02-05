@@ -214,7 +214,7 @@ export async function POST(req) {
     console.log("realityFiles:", realityFiles?.length, "items");
     console.log("files:", files?.length, "items");
     console.log("isCompare:", isCompare);
-    console.log("input:", input?.substring(0, 50));
+    console.log("input:", input?.substring(0, 1000));
 
     const promptParts = [];
 
