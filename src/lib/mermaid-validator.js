@@ -26,71 +26,52 @@ export function sanitizeMermaidCode(rawCode) {
     return null;
   }
   
-  // 4. CORRECTION CRITIQUE : Nettoyer les guillemets et parenthèses mal placées
-  // Remplacer les patterns problématiques comme [") ou ("]
+  // 4. CORRECTION CRITIQUE : Nettoyer TOUS les crochets imbriqués
+  // Pattern: [...] внутри [...] - transformer en un seul niveau
+  code = code.replace(/\[([^\[\]]*)\[([^\[\]]*)\]([^\[\]]*)\]/g, (match, before, inside, after) => {
+    // NodeA[NodeB[DHT]]] → NodeA_NodeB_DHT
+    const clean = (before + '_' + inside + '_' + after).replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_');
+    return `[${clean}]`;
+  });
+  
+  // 5. Corriger les patterns courants cassés
+  // [") ou ("]
   code = code.replace(/\["\)/g, '"]');
-  code = code.replace(/\("\]/g, '["');
-  code = code.replace(/\['\)/g, "']");
-  code = code.replace(/\('\]/g, "['");
+  code = code.replace(/\["\]/g, '"]');
+  code = code.replace(/\["\\]/g, '"]');
   
-  // Correction agressive: tout pattern [quelque chose) doit devenir [quelque chose]
-  // GPIO_LED["Broche GPIO[LED)"] --> GPIO_LED["Broche GPIO[LED]"]
-  code = code.replace(/\[([^\]]+)\)/g, (match, content) => {
-    return `[${content}]`;
+  // 6. Corriger les )]-[ ou ])-[ 
+  code = code.replace(/\)\]\s*-->/g, ']-->');
+  code = code.replace(/\)\](\s*\[)/g, ']$1');
+  
+  // 7. Corriger les ]] finaux
+  code = code.replace(/\]\]+/g, ']');
+  
+  // 8. Nettoyer les labels avec underscores problématiques
+  // Si on a NodeID[something_with_underscore_and_more]
+  code = code.replace(/\[([^\]]*_[^\]]*)\]/g, (match, label) => {
+    const clean = label.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_');
+    return `[${clean}]`;
   });
   
-  // 5. Corriger les IDs avec parenthèses (Node() → Node)
-  code = code.replace(/(\w+)\s*\(/g, (match, id) => {
-    // Si c'est suivi d'un crochet, c'est probablement un nœud
-    return `${id.replace(/[^a-zA-Z0-9_]/g, '_')}[`;
-  });
+  // 9. CORRECTION FINALE : Matcher les [][] pairs et les fusionner
+  // Loop jusqu'à ce qu'il n'y ait plus de []
+  let previousCode = '';
+  while (code !== previousCode) {
+    previousCode = code;
+    code = code.replace(/\[([^\[\]]*)\]\[([^\[\]]*)\]/g, '[$1_$2]');
+  }
   
-  // 6. Supprimer les pipes dans les connexions
+  // 10. Supprimer les pipes dans les connexions
   code = code.replace(/-->\s*\|[^|]+\|\s*/g, ' --> ');
   code = code.replace(/---\s*\|[^|]+\|\s*/g, ' --- ');
   code = code.replace(/-\.->\s*\|[^|]+\|\s*/g, ' -.-> ');
   code = code.replace(/==>\s*\|[^|]+\|\s*/g, ' ==> ');
   
-  // 7. Supprimer les notes (non supportées dans flowchart)
+  // 11. Supprimer les notes (non supportées dans flowchart)
   code = code.replace(/note\s+(left|right|over|below)\s+of\s+\w+.*$/gm, '');
   
-  // 8. Nettoyer les labels de nœuds
-  code = code.replace(/\[([^\]]+)\]/g, (match, label) => {
-    // Supprimer les guillemets existants mal placés
-    let cleanLabel = label.replace(/^["']+|["']+$/g, '');
-    
-    // Si le label contient des caractères spéciaux ou espaces, ajouter des guillemets
-    if (cleanLabel.includes(' ') || 
-        cleanLabel.includes(':') || 
-        cleanLabel.includes('/') || 
-        cleanLabel.includes('(') || 
-        cleanLabel.includes(')') ||
-        cleanLabel.includes('"') ||
-        cleanLabel.includes("'")) {
-      // Échapper les guillemets internes
-      cleanLabel = cleanLabel.replace(/"/g, '\\"');
-      return `["${cleanLabel}"]`;
-    }
-    
-    return `[${cleanLabel}]`;
-  });
-  
-  // 9. Corriger les formes spéciales mal formées
-  // Formes valides: [] () {} (()) [[]] [/\] [\] >/] [()] ((()))
-  code = code.replace(/\(\s*"/g, '["');  // (" → ["
-  code = code.replace(/"\s*\)/g, '"]');  // ") → "]
-  
-  // 10. Nettoyer les IDs de subgraphs
-  code = code.replace(/subgraph\s+([^\s\[{]+)/g, (match, id) => {
-    const cleanId = id.replace(/[^a-zA-Z0-9_]/g, '_');
-    return `subgraph ${cleanId}`;
-  });
-  
-  // 11. Supprimer les doubles espaces et lignes vides excessives
-  code = code.replace(/  +/g, ' ');
-  code = code.replace(/\n{3,}/g, '\n\n');
-  
-  // 12. Vérifier que chaque ligne de connexion est valide
+  // 12. Validation finale : vérifier la structure
   const lines = code.split('\n');
   const cleanedLines = lines.map(line => {
     const trimmed = line.trim();
@@ -106,24 +87,19 @@ export function sanitizeMermaidCode(rawCode) {
     }
     
     // Si c'est une définition de nœud ou une connexion
-    // Vérifier qu'il n'y a pas de caractères invalides en dehors des guillemets
     if (trimmed.includes('-->') || trimmed.includes('---') || trimmed.includes('[')) {
-      // Supprimer les guillemets orphelins en dehors des crochets
-      let cleaned = trimmed;
+      // Vérifier qu'il n'y a pas de crochets orphelins
+      const openBrackets = (trimmed.match(/\[/g) || []).length;
+      const closeBrackets = (trimmed.match(/\]/g) || []).length;
       
-      // Pattern pour détecter les guillemets en dehors des []
-      // On garde les guillemets uniquement à l'intérieur de []
-      const parts = cleaned.split(/(\[[^\]]*\])/);
-      cleaned = parts.map((part, idx) => {
-        // Si c'est un bloc [...], on le garde tel quel
-        if (part.startsWith('[') && part.endsWith(']')) {
-          return part;
+      if (openBrackets !== closeBrackets) {
+        // Corriger le déséquilibre
+        if (openBrackets > closeBrackets) {
+          return trimmed + ']'.repeat(openBrackets - closeBrackets);
         }
-        // Sinon, on supprime les guillemets orphelins
-        return part.replace(/["']/g, '');
-      }).join('');
+      }
       
-      return cleaned;
+      return trimmed;
     }
     
     return line;
@@ -131,29 +107,16 @@ export function sanitizeMermaidCode(rawCode) {
   
   code = cleanedLines.join('\n');
   
-  // 13. Validation finale : supprimer les lignes qui causeraient des erreurs
-  const finalLines = code.split('\n').filter(line => {
-    const trimmed = line.trim();
-    
-    // Garder les lignes vides, commentaires, et mots-clés
-    if (trimmed === '' || 
-        trimmed.startsWith('%%') || 
-        trimmed === 'end' ||
-        validTypes.some(type => trimmed.startsWith(type)) ||
-        trimmed.startsWith('subgraph')) {
-      return true;
-    }
-    
-    // Vérifier que les lignes de nœuds/connexions sont valides
-    // Pattern simple : doit contenir soit [], soit une flèche
-    return trimmed.includes('[') || 
-           trimmed.includes('-->') || 
-           trimmed.includes('---') ||
-           trimmed.includes('-.->') ||
-           trimmed.includes('==>');
+  // 13. Dernière vérification : supprimer les [] qui ne ferment pas
+  code = code.replace(/\[([^\]]*)$/g, (match) => {
+    // Enlever les crochets ouvrants sans fermeture
+    return match.replace(/\[/g, '');
   });
   
-  return finalLines.join('\n').trim();
+  // 14. Nettoyer les doubles underscores
+  code = code.replace(/_+/g, '_');
+  
+  return code.trim();
 }
 
 /**

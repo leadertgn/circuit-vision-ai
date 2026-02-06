@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Menu, LayoutGrid, BarChart3, Cpu, Zap } from "lucide-react";
+import { Menu, BarChart3, Cpu, Zap, Copy } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { getSessionId } from "@/lib/session";
 import { useGithubDocButton } from "@/hooks/useGithubDocButton";
+import { extractComponentsFromCode } from "@/lib/component-search";
 
 // Components
 import { ConversationList } from "@/components/sidebar/ConversationList";
@@ -221,7 +222,7 @@ export default function Home() {
       if (!chatId) {
         const docRef = await addDoc(collection(db, "conversations"), {
           sessionId,
-          title: "Nouvelle conversation",  // Titre temporaire, sera remplacé par l'API
+          title: "Nouvelle conversation", // Titre temporaire, sera remplacé par l'API
           updatedAt: serverTimestamp(),
         });
         chatId = docRef.id;
@@ -277,6 +278,7 @@ export default function Home() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chatId,
+              userFirstQuery: input,
               aiFirstResponse: data.analysis || "Analyse Technique",
             }),
           });
@@ -324,7 +326,14 @@ export default function Home() {
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             try {
-              const data = JSON.parse(line.slice(6));
+              const jsonStr = line.slice(6).trim();
+
+              // Ignorer les lignes vides ou trop courtes
+              if (!jsonStr || jsonStr.length < 10) {
+                continue;
+              }
+
+              const data = JSON.parse(jsonStr);
               console.log("Data event:", data.event, data.text ? data.text.substring(0, 50) : "");
 
               if (data.text) {
@@ -354,6 +363,7 @@ export default function Home() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       chatId,
+                      userFirstQuery: input,
                       aiFirstResponse: accumulatedText,
                     }),
                   });
@@ -364,12 +374,18 @@ export default function Home() {
                 }
 
                 if (data.data?.metadata?.componentsFound > 0) {
-                  setSimulatorData({ code: accumulatedText, components: [] });
+                  const extractedComponents = extractComponentsFromCode(accumulatedText);
+                  setSimulatorData({
+                    code: accumulatedText,
+                    components: extractedComponents,
+                  });
                   setShowSimulator(true);
                 }
               }
             } catch (e) {
-              console.error("Parse error:", e);
+              // Ignorer les erreurs de parsing pour les chunks partiels
+              console.warn("Parse error ignoré (chunk partiel):", e.message.substring(0, 100));
+              continue;
             }
           }
         }
@@ -566,7 +582,7 @@ export default function Home() {
                     : "bg-gray-800 text-gray-400 hover:text-white"
                 }`}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <Copy className="w-4 h-4" />
                 Mode comparaison
               </button>
             </div>

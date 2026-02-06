@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Component Search - Recherche automatique de composants avec prix et liens d'achat
  * Utilise Google Search de Gemini 3 pour trouver les meilleurs prix
  */

@@ -2,16 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-import {
-  TrendingUp,
-  Clock,
-  Bug,
-  ShoppingCart,
-  FileText,
-  Github,
-  Zap,
-  Award,
-} from "lucide-react";
+import { Clock, Bug, ShoppingCart, FileText, Github, Zap, Award } from "lucide-react";
 
 export default function AnalyticsDashboard({ sessionId }) {
   const [stats, setStats] = useState({
@@ -29,22 +20,35 @@ export default function AnalyticsDashboard({ sessionId }) {
 
   const loadAnalytics = useCallback(async () => {
     try {
-      const chatsRef = collection(db, "chats");
+      const conversationsRef = collection(db, "conversations");
 
       // Requête pour tous les chats de l'utilisateur
-      const q = query(chatsRef, where("sessionId", "==", sessionId), orderBy("createdAt", "desc"), limit(50));
+      const q = query(
+        conversationsRef,
+        where("sessionId", "==", sessionId),
+        orderBy("createdAt", "desc"),
+        limit(50)
+      );
 
       const snapshot = await getDocs(q);
-      const chats = snapshot.docs.map((doc) => ({
+      const conversations = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
       // Calculs des métriques
-      const totalAnalyses = chats.length;
-      const totalBugsFound = chats.reduce((sum, chat) => sum + (chat.bugsDetected || 0), 0);
-      const totalComponents = chats.reduce((sum, chat) => sum + (chat.componentCount || 0), 0);
-      const githubCommits = chats.filter((chat) => chat.hasGithubUrl).length;
+      const totalAnalyses = conversations.length;
+      const totalBugsFound = conversations.reduce(
+        (sum, conversation) => sum + (conversation.bugsDetected || 0),
+        0
+      );
+      const totalComponents = conversations.reduce(
+        (sum, conversation) => sum + (conversation.componentCount || 0),
+        0
+      );
+      const githubCommits = conversations.filter(
+        (conversation) => conversation.hasGithubUrl
+      ).length;
 
       // Temps moyen d'analyse (estimé à 25s par analyse avec notre IA)
       const avgAnalysisTime = 25;
@@ -61,13 +65,13 @@ export default function AnalyticsDashboard({ sessionId }) {
       const moneySaved = totalTimeSaved * 50;
 
       // Projets récents
-      const recentProjects = chats.slice(0, 5).map((chat) => ({
-        id: chat.id,
-        query: chat.userQuery?.substring(0, 60) + "...",
-        bugs: chat.bugsDetected || 0,
-        components: chat.componentCount || 0,
-        hasGithub: chat.hasGithubUrl,
-        createdAt: chat.createdAt?.toDate?.() || new Date(),
+      const recentProjects = conversations.slice(0, 5).map((conversation) => ({
+        id: conversation.id,
+        query: conversation.userQuery?.substring(0, 60) + "...",
+        bugs: conversation.bugsDetected || 0,
+        components: conversation.componentCount || 0,
+        hasGithub: conversation.hasGithubUrl,
+        createdAt: conversation.createdAt?.toDate?.() || new Date(),
       }));
 
       setStats({
@@ -120,7 +124,12 @@ export default function AnalyticsDashboard({ sessionId }) {
       <div className="grid grid-cols-2 gap-2">
         <MetricCard icon={FileText} label="Analyses" value={stats.totalAnalyses} color="blue" />
         <MetricCard icon={Bug} label="Bugs" value={stats.totalBugsFound} color="red" />
-        <MetricCard icon={ShoppingCart} label="Composants" value={stats.totalComponents} color="green" />
+        <MetricCard
+          icon={ShoppingCart}
+          label="Composants"
+          value={stats.totalComponents}
+          color="green"
+        />
         <MetricCard icon={Github} label="GitHub" value={stats.githubCommits} color="purple" />
       </div>
 
@@ -157,13 +166,17 @@ export default function AnalyticsDashboard({ sessionId }) {
           </div>
           <div>
             <p className="text-xl font-bold text-red-400">
-              {stats.totalBugsFound > 0 ? Math.round((stats.totalBugsFound / stats.totalAnalyses) * 10) / 10 : 0}
+              {stats.totalBugsFound > 0
+                ? Math.round((stats.totalBugsFound / stats.totalAnalyses) * 10) / 10
+                : 0}
             </p>
             <p className="text-xs text-gray-400">Bugs/projet</p>
           </div>
           <div>
             <p className="text-xl font-bold text-green-400">
-              {stats.totalComponents > 0 ? Math.round((stats.totalComponents / stats.totalAnalyses) * 10) / 10 : 0}
+              {stats.totalComponents > 0
+                ? Math.round((stats.totalComponents / stats.totalAnalyses) * 10) / 10
+                : 0}
             </p>
             <p className="text-xs text-gray-400">Composants</p>
           </div>
@@ -177,7 +190,9 @@ export default function AnalyticsDashboard({ sessionId }) {
         </div>
         <div className="divide-y divide-gray-700">
           {stats.recentProjects.length === 0 ? (
-            <div className="px-4 py-6 text-center text-gray-500 text-sm">Aucun projet pour le moment</div>
+            <div className="px-4 py-6 text-center text-gray-500 text-sm">
+              Aucun projet pour le moment
+            </div>
           ) : (
             stats.recentProjects.map((project) => <ProjectRow key={project.id} project={project} />)
           )}
@@ -198,7 +213,9 @@ function MetricCard({ icon: Icon, label, value, color }) {
 
   return (
     <div className="bg-gray-800 rounded-lg p-3">
-      <div className={`w-8 h-8 ${colorClasses[color]} rounded-lg flex items-center justify-center mb-2`}>
+      <div
+        className={`w-8 h-8 ${colorClasses[color]} rounded-lg flex items-center justify-center mb-2`}
+      >
         <Icon className="w-4 h-4 text-white" />
       </div>
       <p className="text-2xl font-bold text-white">{value}</p>
@@ -223,7 +240,10 @@ function ImpactCard({ icon: Icon, title, value, subtitle, percentage, color }) {
       <p className={`text-xl font-bold ${colorClasses[color].text}`}>{value}</p>
       <p className="text-xs text-gray-500 mb-2">{subtitle}</p>
       <div className="w-full bg-gray-700 rounded-full h-1.5">
-        <div className={`${colorClasses[color].bar} h-1.5 rounded-full`} style={{ width: `${percentage}%` }}></div>
+        <div
+          className={`${colorClasses[color].bar} h-1.5 rounded-full`}
+          style={{ width: `${percentage}%` }}
+        ></div>
       </div>
     </div>
   );

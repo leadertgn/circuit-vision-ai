@@ -54,6 +54,6 @@ export function useGithubDocButton(messages, activeChatId) {
   return {
     shouldShowButton,
     githubUrl,
-    documentationContent: documentationMessage?.content,
+    documentationContent: documentationMessage?.text,
   };
 }

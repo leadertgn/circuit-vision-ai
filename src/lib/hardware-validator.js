@@ -1,4 +1,4 @@
-/**
+﻿﻿/**
  * Hardware Validator - Détecte automatiquement les bugs dans les circuits embarqués
  * Innovation majeure pour le hackathon Gemini 3
  */

@@ -7,18 +7,23 @@ import { z } from "zod";
 // Server-side API key only - NO NEXT_PUBLIC_ prefix
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro"];
+const MODELS = [
+  "gemini-2.5-flash", // Stable + rapide
+  "gemini-2.5-flash-lite", // Stable + économique
+  "gemini-2.5-pro", // Stable + puissant
+];
 
 // Validation schema
 const TitleSchema = z.object({
   chatId: z.string().min(1),
+  userFirstQuery: z.string().min(1).optional(),
   aiFirstResponse: z.string().min(10),
 });
 
 export async function POST(req) {
   try {
     // Validate input
-    const { chatId, aiFirstResponse } = TitleSchema.parse(await req.json());
+    const { chatId, userFirstQuery, aiFirstResponse } = TitleSchema.parse(await req.json());
 
     // Vérifier si un titre personnalisé existe déjà
     const convRef = doc(db, "conversations", chatId);
@@ -43,7 +48,14 @@ export async function POST(req) {
     for (const modelName of MODELS) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
-        const prompt = `Génère un titre très court (3 à 5 mots) en français pour cette analyse : "${aiFirstResponse.substring(0, 300)}". Réponds uniquement le titre.`;
+
+        // Construire le prompt avec les deux inputs
+        const userContext = userFirstQuery
+          ? `Requête utilisateur: "${userFirstQuery.substring(0, 150)}"`
+          : "";
+        const aiContext = `Analyse IA: "${aiFirstResponse.substring(0, 300)}"`;
+
+        const prompt = `Génère un titre très court (3 à 5 mots) en français qui combine ces deux éléments :\n${userContext}\n${aiContext}\n\nLe titre doit refléter le PROJET ou le SUJET principal, pas la réponse technique. Réponds uniquement le titre.`;
 
         const result = await model.generateContent(prompt);
         title = result.response.text().trim().replace(/[".]/g, "");
