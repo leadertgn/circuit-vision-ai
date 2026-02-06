@@ -219,7 +219,7 @@ export async function POST(req) {
     console.log("realityFiles:", realityFiles?.length, "items");
     console.log("files:", files?.length, "items");
     console.log("isCompare:", isCompare);
-    console.log("input:", input?.substring(0, 50));
+    console.log("input:", input?.substring(0, 1000));
 
     const promptParts = [];
 
@@ -438,123 +438,123 @@ export async function POST(req) {
         };
 
         const chat = model.startChat(chatConfig);
+// REMPLACER la section streaming (ligne 325-390) dans src/app/api/analyze/route.js
 
-        // ðŸ†• GESTION STREAMING SSE OU NORMAL
-        if (enableStreaming) {
-          // MODE STREAMING SSE
-          const encoder = new TextEncoder();
+if (enableStreaming) {
+  // MODE STREAMING SSE
+  const encoder = new TextEncoder();
 
-          const stream = new ReadableStream({
-            async start(controller) {
-              try {
-                const result = await chat.sendMessageStream(promptParts);
-                let fullResponse = "";
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        // 1. Envoyer status initial
+        controller.enqueue(
+          encoder.encode(`event: status\ndata: ${JSON.stringify({ message: "Analyse en cours..." })}\n\n`)
+        );
 
-                // Envoyer l'Ã©vÃ©nement initial
-                controller.enqueue(
-                  encoder.encode(
-                    `event: status\ndata: ${JSON.stringify({ status: "Analyse en cours..." })}\n\n`
-                  )
-                );
+        // 2. Analyser et envoyer bugs si GitHub
+        if (githubContext) {
+          const hardwareAnalysis = analyzeHardwareCode(githubContext);
+          if (hardwareAnalysis.bugs.length > 0) {
+            controller.enqueue(
+              encoder.encode(
+                `event: bugs_detected\ndata: ${JSON.stringify({
+                  bugs: hardwareAnalysis.bugs,
+                  stats: hardwareAnalysis.stats
+                })}\n\n`
+              )
+            );
+          }
 
-                // Analyser et envoyer les bugs dÃ©tectÃ©s
-                if (githubContext) {
-                  const hardwareAnalysis = analyzeHardwareCode(githubContext);
-                  if (hardwareAnalysis.bugs.length > 0) {
-                    controller.enqueue(
-                      encoder.encode(
-                        `event: bugs_detected\ndata: ${JSON.stringify(hardwareAnalysis)}\n\n`
-                      )
-                    );
-                  }
+          const components = extractComponentsFromCode(githubContext);
+          if (components.length > 0) {
+            const shoppingData = {
+              items: components.map((comp) => ({
+                component: comp,
+                quantity: 1,
+                estimated_price: "À rechercher",
+              })),
+            };
+            controller.enqueue(
+              encoder.encode(
+                `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
+              )
+            );
+          }
+        }
 
-                  const components = extractComponentsFromCode(githubContext);
-                  if (components.length > 0) {
-                    const shoppingList = {
-                      success: true,
-                      items: components.map((comp) => ({
-                        component: comp,
-                        quantity: 1,
-                        estimated_price: "Ã€ rechercher",
-                        purchase_links: [],
-                        alternatives: [],
-                      })),
-                    };
-                    controller.enqueue(
-                      encoder.encode(
-                        `event: shopping_list\ndata: ${JSON.stringify(shoppingList)}\n\n`
-                      )
-                    );
-                  }
-                }
+        // 3. Stream Gemini response
+        const result = await chat.sendMessageStream(promptParts);
+        let fullResponse = "";
 
-                // Stream des chunks
-                for await (const chunk of result.stream) {
-                  const chunkText = chunk.text();
-                  fullResponse += chunkText;
-                  // Envoyer chaque chunk comme donnÃ©es SSE
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
-                  );
-                }
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          fullResponse += chunkText;
 
-                // Post-traitement Mermaid
-                const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
-                fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
-                  const sanitized = sanitizeMermaidCode(code);
-                  return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
-                });
+          // Envoyer chunk (pas d'event, juste data)
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
+          );
+        }
 
-                // Envoyer l'Ã©vÃ©nement de completion
-                const completionData = {
-                  analysis: fullResponse,
-                  githubUrl: githubUrl,
-                  metadata: {
-                    bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
-                    componentsFound: githubContext
-                      ? extractComponentsFromCode(githubContext).length
-                      : 0,
-                    platform: githubContext ? detectPlatformType(githubContext).type : "unknown",
-                  },
-                };
+        // 4. Post-traitement Mermaid
+        const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+        fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
+          const sanitized = sanitizeMermaidCode(code);
+          return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
+        });
 
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({ ...completionData, event: "complete" })}\n\n`
-                  )
-                );
+        // 5. Envoyer completion event
+        controller.enqueue(
+          encoder.encode(
+            `event: complete\ndata: ${JSON.stringify({
+              analysis: fullResponse,
+              githubUrl: githubUrl,
+              metadata: {
+                bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
+                componentsFound: githubContext ? extractComponentsFromCode(githubContext).length : 0,
+                platform: githubContext ? detectPlatformType(githubContext).type : "unknown",
+              },
+            })}\n\n`
+          )
+        );
 
-                // Sauvegarder dans Firestore en arriÃ¨re-plan (ne pas bloquer le stream)
-                addDoc(collection(db, "chats"), {
-                  sessionId: sessionId || "anonyme",
-                  type: isCompare ? "audit" : "simple",
-                  userQuery: input,
-                  aiResponse: fullResponse,
-                  hasGithubUrl: !!githubUrl,
-                  githubUrl: githubUrl,
-                  bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
-                  componentsCount: githubContext
-                    ? extractComponentsFromCode(githubContext).length
-                    : 0,
-                  createdAt: serverTimestamp(),
-                }).catch(console.error);
+        // 6. Sauvegarder Firestore (async, ne bloque pas)
+        addDoc(collection(db, "chats"), {
+          sessionId: sessionId || "anonyme",
+          type: isCompare ? "audit" : "simple",
+          userQuery: input,
+          aiResponse: fullResponse,
+          hasGithubUrl: !!githubUrl,
+          githubUrl: githubUrl,
+          bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
+          componentsCount: githubContext ? extractComponentsFromCode(githubContext).length : 0,
+          createdAt: serverTimestamp(),
+        }).catch(console.error);
 
-                controller.close();
-              } catch (err) {
-                controller.error(err);
-              }
-            },
-          });
+        controller.close();
+      } catch (err) {
+        console.error("❌ Stream error:", err);
+        controller.enqueue(
+          encoder.encode(
+            `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`
+          )
+        );
+        controller.error(err);
+      }
+    },
+  });
 
-          return new Response(stream, {
-            headers: {
-              "Content-Type": "text/event-stream",
-              "Cache-Control": "no-cache",
-              Connection: "keep-alive",
-            },
-          });
-        } else {
-          // MODE NORMAL (JSON) - continue jusqu'Ã  la fin de la fonction
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no", // Nginx unbuffering
+    },
+  });
+} else {
+          // MODE NORMAL (JSON) - continue jusqu'à la fin de la fonction
           const result = await chat.sendMessage(promptParts);
           aiResponse = result.response.text();
         }

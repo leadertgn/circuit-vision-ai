@@ -1,4 +1,5 @@
-// components/GithubDocButton.js
+// REMPLACER src/components/GithubDocButton.js entièrement par :
+
 "use client";
 import { useState } from "react";
 import { Github, Check, AlertCircle } from "lucide-react";
@@ -10,9 +11,10 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
     setStatus("loading");
 
     try {
-      const response = await fetch("/api/github/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      // ✅ CORRECTION : Utiliser /api/github/commit (pas /api/github-update)
+      const response = await fetch('/api/github/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           repoUrl: githubUrl,
           content: documentationContent,
@@ -25,7 +27,9 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
         onSuccess?.();
         setTimeout(() => setStatus("idle"), 3000);
       } else {
-        throw new Error("Échec de l'envoi");
+        const error = await response.json();
+        console.error('GitHub error:', error);
+        throw new Error(error.error || 'Échec de l\'envoi');
       }
     } catch (error) {
       console.error("Erreur GitHub:", error);
@@ -84,16 +88,16 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
   };
 
   return (
-    <div className="flex flex-col gap-2 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+    <div className="flex flex-col gap-2 p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-700 rounded-lg">
       <div className="flex items-start gap-3">
         <div className="mt-1">
-          <Github className="w-5 h-5 text-purple-600" />
+          <Github className="w-5 h-5 text-purple-400" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold text-gray-800 mb-1">
+          <p className="text-sm font-semibold text-gray-200 mb-1">
             📝 Documentation complète générée
           </p>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-400">
             La documentation technique est prête à être ajoutée à votre dépôt GitHub.
           </p>
         </div>
@@ -106,10 +110,16 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
       >
         {getButtonContent()}
       </button>
-
-      {status === "success" && (
-        <p className="text-xs text-green-700 bg-green-50 px-3 py-1.5 rounded">
+      
+      {status === 'success' && (
+        <p className="text-xs text-green-400 bg-green-900/30 px-3 py-1.5 rounded border border-green-700">
           ✓ Fichier CIRCUIT_DOCUMENTATION.md créé dans votre repo
+        </p>
+      )}
+      
+      {status === 'error' && (
+        <p className="text-xs text-red-400 bg-red-900/30 px-3 py-1.5 rounded border border-red-700">
+          ❌ Erreur : Vérifiez que GITHUB_TOKEN est configuré dans .env.local
         </p>
       )}
     </div>
