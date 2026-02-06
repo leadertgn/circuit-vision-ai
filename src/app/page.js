@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Menu, LayoutGrid, BarChart3, Cpu, Zap } from "lucide-react";
+import { Menu, BarChart3, Cpu, Zap, Copy } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { getSessionId } from "@/lib/session";
 import { useGithubDocButton } from "@/hooks/useGithubDocButton";
+import { extractComponentsFromCode } from "@/lib/component-search";
 
 // Components
 import { ConversationList } from "@/components/sidebar/ConversationList";
@@ -221,7 +222,7 @@ export default function Home() {
       if (!chatId) {
         const docRef = await addDoc(collection(db, "conversations"), {
           sessionId,
-          title: "Nouvelle conversation",  // Titre temporaire, sera remplacé par l'API
+          title: "Nouvelle conversation", // Titre temporaire, sera remplacé par l'API
           updatedAt: serverTimestamp(),
         });
         chatId = docRef.id;
@@ -277,6 +278,7 @@ export default function Home() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               chatId,
+              userFirstQuery: input,
               aiFirstResponse: data.analysis || "Analyse Technique",
             }),
           });
@@ -594,7 +596,7 @@ const handleStreamingResponse = async (response, chatId) => {
                     : "bg-gray-800 text-gray-400 hover:text-white"
                 }`}
               >
-                <LayoutGrid className="w-4 h-4" />
+                <Copy className="w-4 h-4" />
                 Mode comparaison
               </button>
             </div>

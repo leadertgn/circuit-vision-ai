@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+﻿﻿import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@/lib/firebase";
 import { getRepoContent } from "@/lib/github";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -8,7 +8,8 @@ import { extractGithubUrl } from "@/lib/doc-completion-detector";
 import { analyzeHardwareCode } from "@/lib/hardware-validator";
 import { extractComponentsFromCode } from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
-import { z } from "zod";
+import { DocumentationSchema } from "@/lib/schemas";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 // Server-side API key only
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -16,7 +17,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 export const maxDuration = 60;
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
-// 🚨 RATE LIMITING SIMPLE (en mémoire)
+// ðŸš¨ RATE LIMITING SIMPLE (en mÃ©moire)
 const requestCounts = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
@@ -40,37 +41,37 @@ function checkRateLimit(ip) {
 }
 
 const SYSTEM_INSTRUCTION = `
-Tu es CircuitVision AI, Expert en Systèmes Embarqués.
+Tu es CircuitVision AI, Expert en SystÃ¨mes EmbarquÃ©s.
 
 Tu peux analyser:
 1. DU CODE SOURCE (Arduino, ESP32, etc.)
 2. DES IMAGES de circuits PCB
-3. DES VIDÉOS de montages
+3. DES VIDÃ‰OS de montages
 
-Pour les IMAGES/VIDÉOS:
-- Décris les composants visibles
-- Propose un schéma de câblage
+Pour les IMAGES/VIDÃ‰OS:
+- DÃ©cris les composants visibles
+- Propose un schÃ©ma de cÃ¢blage
 - Demande le code si disponible
 
 
-❌ NE JAMAIS :
-- Inventer des informations non présentes dans le code
-- Parler de composants non mentionnés dans le code
-- Spéculer sur l'architecture si pas évident
-- Générer plusieurs versions de la même chose
-- Te répéter ou régénérer du contenu déjà écrit
+âŒ NE JAMAIS :
+- Inventer des informations non prÃ©sentes dans le code
+- Parler de composants non mentionnÃ©s dans le code
+- SpÃ©culer sur l'architecture si pas Ã©vident
+- GÃ©nÃ©rer plusieurs versions de la mÃªme chose
+- Te rÃ©pÃ©ter ou rÃ©gÃ©nÃ©rer du contenu dÃ©jÃ  Ã©crit
 
-✅ TOUJOURS :
+âœ… TOUJOURS :
 - Analyser UNIQUEMENT le code source fourni
-- Rester factuel et précis
+- Rester factuel et prÃ©cis
 - Citer les fichiers et lignes de code
-- Être concis et direct
+- ÃŠtre concis et direct
 
-═══════════════════════════════════════════════════════════════
-📋 STRUCTURE OBLIGATOIRE (8 SECTIONS MAX)
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ðŸ“‹ STRUCTURE OBLIGATOIRE (8 SECTIONS MAX)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-Pour un projet GitHub, génère EXACTEMENT ces sections :
+Pour un projet GitHub, gÃ©nÃ¨re EXACTEMENT ces sections :
 
 ## 1. Vue d'ensemble
 Objectif (2-3 phrases) + Architecture
@@ -81,51 +82,55 @@ Tableau : Composant | Pin | Fonction | Notes
 ## 3. Configuration des Pins
 Code extrait avec #define
 
-## 4. Bibliothèques
-Liste #include avec rôles
+## 4. BibliothÃ¨ques
+Liste #include avec rÃ´les
 
 ## 5. Logique du Code
 setup(), loop(), fonctions critiques
 
-## 6. Schéma de Câblage
-Diagramme Mermaid (RESPECTE RÈGLES)
+## 6. SchÃ©ma de CÃ¢blage
+Diagramme Mermaid (RESPECTE RÃˆGLES)
 
 ## 7. Installation
-Étapes concrètes
+Ã‰tapes concrÃ¨tes
 
-## 8. Tests et Dépannage
-Points de contrôle
+## 8. Tests et DÃ©pannage
+Points de contrÃ´le
 
-🔴 APRÈS SECTION 8 : STOP
-Ne génère PAS de contenu supplémentaire sauf si demandé.
+ðŸ”´ APRÃˆS SECTION 8 : STOP
+Ne gÃ©nÃ¨re PAS de contenu supplÃ©mentaire sauf si demandÃ©.
 
-═══════════════════════════════════════════════════════════════
-🔄 CONTINUATIONS
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ðŸ”„ CONTINUATIONS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 Si "continue" :
-1. Identifie dernière section générée
-2. Génère UNIQUEMENT section suivante
-3. Si 8 sections faites → "Documentation complète"
-4. Aucun préambule
+1. Identifie derniÃ¨re section gÃ©nÃ©rÃ©e
+2. GÃ©nÃ¨re UNIQUEMENT section suivante
+3. Si 8 sections faites â†’ "Documentation complÃ¨te"
+4. Aucun prÃ©ambule
 
-═══════════════════════════════════════════════════════════════
-🚨 MERMAID (ZÉRO TOLÉRANCE)
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ðŸš¨ MERMAID (ZÃ‰RO TOLÃ‰RANCE)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-AUTORISÉ :
+AUTORISE :
 flowchart TD
-    NodeID["Label"]
-    NodeID --> NodeID2
+    NodeA["Label"]
+    NodeA --> NodeB
 
 INTERDIT :
-❌ flowchart LR
-❌ Node-ID (tirets/espaces)
-❌ Node(Label) (parenthèses)
-❌ -->|Label| (pipes)
-❌ note right of (notes)
+- flowchart LR
+- Node-ID (tirets)
+- Crochets imbriques [A[B[C]]]
+- -->|Label| (pipes)
 
-LANGUE : Français uniquement
++--------------------------------------------------------+
+|  REGLE CRITIQUE : Un seul niveau de crochets [label]  |
+|  JAMAIS [NodeA[NodeB]] - utiliser [NodeA_NodeB]        |
++--------------------------------------------------------+
+
+LANGUE : FranÃ§ais uniquement
 FORMAT : Markdown concis
 `;
 
@@ -133,52 +138,52 @@ const GITHUB_DOC_INSTRUCTION = `
 STRUCTURE DE DOCUMENTATION GITHUB :
 
 1. **Vue d'ensemble du projet**
-   - Objectif et fonctionnalités principales
+   - Objectif et fonctionnalitÃ©s principales
    - Architecture globale (hardware + software)
 
 2. **Liste des Composants Hardware**
    - Tableau : Composant | Pin ESP32 | Fonction | Notes
    
 3. **Configuration des Pins (Code Source)**
-   - Extrait des #define ou déclarations de pins
+   - Extrait des #define ou dÃ©clarations de pins
    - Mapping exact entre pins physiques et logiques
 
-4. **Bibliothèques et Dépendances**
-   - Liste des #include avec leurs rôles
+4. **BibliothÃ¨ques et DÃ©pendances**
+   - Liste des #include avec leurs rÃ´les
 
 5. **Logique du Code Principal**
-   - Étapes du setup()
+   - Ã‰tapes du setup()
    - Cycle de la loop()
-   - Fonctions critiques identifiées
+   - Fonctions critiques identifiÃ©es
 
-6. **Schéma de Câblage (Mermaid)**
-   - Représentation graphique du branchement théorique basé sur le code
-   - UTILISE UNIQUEMENT flowchart TD avec IDs alphanumériques
+6. **SchÃ©ma de CÃ¢blage (Mermaid)**
+   - ReprÃ©sentation graphique du branchement thÃ©orique basÃ© sur le code
+   - UTILISE UNIQUEMENT flowchart TD avec IDs alphanumÃ©riques
 
-7. **Procédure d'Installation**
+7. **ProcÃ©dure d'Installation**
    - Configuration IDE (Arduino/PlatformIO)
-   - Installation des bibliothèques
+   - Installation des bibliothÃ¨ques
    - Configuration Wi-Fi/Firebase si applicable
    - Compilation et upload
 
-8. **Tests et Dépannage**
-   - Points de contrôle hardware
-   - Vérifications Serial Monitor
+8. **Tests et DÃ©pannage**
+   - Points de contrÃ´le hardware
+   - VÃ©rifications Serial Monitor
    - Erreurs courantes et solutions
 
-Ne termine JAMAIS par "CircuitVision à votre service" ou phrases similaires.
+Ne termine JAMAIS par "CircuitVision Ã  votre service" ou phrases similaires.
 Si le code mentionne des credentials (WiFi, API keys), rappelle de les configurer.
 `;
 
 export async function POST(req) {
   try {
-    // 🚨 RATE LIMITING CHECK
+    // ðŸš¨ RATE LIMITING CHECK
     const ip = req.headers.get("x-forwarded-for") || "unknown";
     const rateLimit = checkRateLimit(ip);
 
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: `Trop de requêtes. Réessaie dans ${rateLimit.waitTime}s` },
+        { error: `Trop de requÃªtes. RÃ©essaie dans ${rateLimit.waitTime}s` },
         { status: 429, headers: { "Retry-After": rateLimit.waitTime.toString() } }
       );
     }
@@ -189,13 +194,13 @@ export async function POST(req) {
       data = await req.json();
     } catch (jsonError) {
       return NextResponse.json(
-        { error: "Format JSON invalide. Vérifiez votre requête." },
+        { error: "Format JSON invalide. VÃ©rifiez votre requÃªte." },
         { status: 400 }
       );
     }
 
     if (!data || typeof data !== "object") {
-      return NextResponse.json({ error: "Données de requête manquantes." }, { status: 400 });
+      return NextResponse.json({ error: "DonnÃ©es de requÃªte manquantes." }, { status: 400 });
     }
 
     const {
@@ -226,7 +231,7 @@ export async function POST(req) {
     let githubUrl = null;
     let githubContext = "";
 
-    // 🆕 ÉTAPE 1 : SCAN GITHUB + ANALYSE HARDWARE
+    // ðŸ†• Ã‰TAPE 1 : SCAN GITHUB + ANALYSE HARDWARE
     if (hasGithub) {
       githubUrl = extractGithubUrl(input);
       if (githubUrl) {
@@ -234,11 +239,11 @@ export async function POST(req) {
 
         if (githubContext) {
           promptParts.push({
-            text: `📂 CODE SOURCE DU PROJET GITHUB :\n\`\`\`\n${githubContext}\n\`\`\``,
+            text: `ðŸ“‚ CODE SOURCE DU PROJET GITHUB :\n\`\`\`\n${githubContext}\n\`\`\``,
           });
           promptParts.push({ text: GITHUB_DOC_INSTRUCTION });
 
-          // 🆕 ANALYSE HARDWARE AUTOMATIQUE
+          // ðŸ†• ANALYSE HARDWARE AUTOMATIQUE
           const hardwareAnalysis = analyzeHardwareCode(githubContext);
 
           if (hardwareAnalysis.bugs.length > 0) {
@@ -246,19 +251,19 @@ export async function POST(req) {
             const warnings = hardwareAnalysis.bugs.filter((b) => b.severity === "warning");
 
             promptParts.push({
-              text: `\n🐛 BUGS HARDWARE DÉTECTÉS AUTOMATIQUEMENT :\n${hardwareAnalysis.bugs.length} bugs trouvés (${criticalBugs.length} critiques, ${warnings.length} avertissements)\n\nIntègre ces bugs dans ta section "Tests et Dépannage" avec leurs solutions.`,
+              text: `\nðŸ› BUGS HARDWARE DÃ‰TECTÃ‰S AUTOMATIQUEMENT :\n${hardwareAnalysis.bugs.length} bugs trouvÃ©s (${criticalBugs.length} critiques, ${warnings.length} avertissements)\n\nIntÃ¨gre ces bugs dans ta section "Tests et DÃ©pannage" avec leurs solutions.`,
             });
           }
 
-          // 🆕 GÉNÉRATION SHOPPING LIST
+          // ðŸ†• GÃ‰NÃ‰RATION SHOPPING LIST
           const components = extractComponentsFromCode(githubContext);
           if (components.length > 0) {
             promptParts.push({
-              text: `\n🛒 COMPOSANTS DÉTECTÉS : ${components.join(", ")}\n\nCrée une section "Shopping List" avec ces composants.`,
+              text: `\nðŸ›’ COMPOSANTS DÃ‰TECTÃ‰S : ${components.join(", ")}\n\nCrÃ©e une section "Shopping List" avec ces composants.`,
             });
           }
 
-          // 🆕 DÉTECTION PLATEFORME
+          // ðŸ†• DÃ‰TECTION PLATEFORME
           const platformInfo = detectPlatformType(githubContext, [
             "main.cpp",
             "platformio.ini",
@@ -266,7 +271,7 @@ export async function POST(req) {
           ]);
           if (platformInfo.platform !== "unknown") {
             promptParts.push({
-              text: `\n🎯 PLATEFORME DÉTECTÉE : ${platformInfo.type} (${platformInfo.platform}) - Confiance: ${platformInfo.confidence}\n\nAdapte ta documentation pour cette plateforme.`,
+              text: `\nðŸŽ¯ PLATEFORME DÃ‰TECTÃ‰E : ${platformInfo.type} (${platformInfo.platform}) - Confiance: ${platformInfo.confidence}\n\nAdapte ta documentation pour cette plateforme.`,
             });
           }
         }
@@ -276,15 +281,15 @@ export async function POST(req) {
     // CONTEXTE SELON MEDIA
     if (hasGithub && !hasMedia) {
       promptParts.push({
-        text: `🎯 CONTEXTE : Tu as reçu UNIQUEMENT du code source GitHub. Aucune image/vidéo n'est fournie. Concentre-toi sur l'analyse du code.`,
+        text: `ðŸŽ¯ CONTEXTE : Tu as reÃ§u UNIQUEMENT du code source GitHub. Aucune image/vidÃ©o n'est fournie. Concentre-toi sur l'analyse du code.`,
       });
     } else if (!hasGithub && hasMedia) {
       promptParts.push({
-        text: `🎯 CONTEXTE : Tu as reçu UNIQUEMENT des images/vidéos. Aucun code GitHub n'est fourni. Analyse le média visuel.`,
+        text: `ðŸŽ¯ CONTEXTE : Tu as reÃ§u UNIQUEMENT des images/vidÃ©os. Aucun code GitHub n'est fourni. Analyse le mÃ©dia visuel.`,
       });
     } else if (hasGithub && hasMedia) {
       promptParts.push({
-        text: `🎯 CONTEXTE : Tu as reçu BOTH code GitHub ET média visuel. Compare-les pour identifier les différences.`,
+        text: `ðŸŽ¯ CONTEXTE : Tu as reÃ§u BOTH code GitHub ET mÃ©dia visuel. Compare-les pour identifier les diffÃ©rences.`,
       });
     }
 
@@ -307,7 +312,7 @@ export async function POST(req) {
     // MODE COMPARAISON
     if (isCompare) {
       if (referenceFiles?.length > 0) {
-        promptParts.push({ text: "📋 DOCUMENTS DE RÉFÉRENCE (SCHÉMA/CODE):" });
+        promptParts.push({ text: "ðŸ“‹ DOCUMENTS DE RÃ‰FÃ‰RENCE (SCHÃ‰MA/CODE):" });
         for (const f of referenceFiles) {
           if (f.url) {
             const imgData = await fetchImageAsBase64(f.url);
@@ -316,7 +321,7 @@ export async function POST(req) {
                 inlineData: { mimeType: imgData.mimeType, data: imgData.base64 },
               });
             } else {
-              promptParts.push({ text: `📎 Fichier: ${f.url}` });
+              promptParts.push({ text: `ðŸ“Ž Fichier: ${f.url}` });
             }
           } else if (f.data) {
             promptParts.push({ inlineData: { mimeType: f.type, data: f.data.split(",")[1] } });
@@ -325,7 +330,7 @@ export async function POST(req) {
       }
 
       if (realityFiles?.length > 0) {
-        promptParts.push({ text: "📸 RÉALITÉ DU MONTAGE (PHOTOS/VIDÉOS):" });
+        promptParts.push({ text: "ðŸ“¸ RÃ‰ALITÃ‰ DU MONTAGE (PHOTOS/VIDÃ‰OS):" });
         for (const f of realityFiles) {
           if (f.url) {
             const imgData = await fetchImageAsBase64(f.url);
@@ -334,7 +339,7 @@ export async function POST(req) {
                 inlineData: { mimeType: imgData.mimeType, data: imgData.base64 },
               });
             } else {
-              promptParts.push({ text: `📎 Fichier: ${f.url}` });
+              promptParts.push({ text: `ðŸ“Ž Fichier: ${f.url}` });
             }
           } else if (f.data) {
             promptParts.push({ inlineData: { mimeType: f.type, data: f.data.split(",")[1] } });
@@ -343,11 +348,11 @@ export async function POST(req) {
       }
 
       promptParts.push({
-        text: `❓ QUESTION : ${input}`,
+        text: `â“ QUESTION : ${input}`,
       });
     } else {
       promptParts.push({
-        text: `❓ QUESTION : ${input || "Fournis une analyse technique complète."}`,
+        text: `â“ QUESTION : ${input || "Fournis une analyse technique complÃ¨te."}`,
       });
 
       // Handle both URL format and base64 format
@@ -359,7 +364,7 @@ export async function POST(req) {
           if (imgData) {
             promptParts.push({ inlineData: { mimeType: imgData.mimeType, data: imgData.base64 } });
           } else {
-            promptParts.push({ text: `📎 Média: ${f.url}` });
+            promptParts.push({ text: `ðŸ“Ž MÃ©dia: ${f.url}` });
           }
         } else if (f.data) {
           // Base64 format
@@ -368,35 +373,32 @@ export async function POST(req) {
       }
     }
 
-    // 🆕 CHOIX DU MODE : STREAMING OU STRUCTURED OUTPUT
+    // ðŸ†• CHOIX DU MODE : STREAMING OU STRUCTURED OUTPUT
     const useStructuredOutput = hasGithub && !enableStreaming; // Structured output pour GitHub sans streaming
 
     let aiResponse = "";
-    // Modèles Gemini 2.5 (stables pour démo)
     const modelsToTry = [
+    //  "gemini-3-flash-preview", instable 
       "gemini-2.5-flash", // Stable + rapide
-      "gemini-2.5-flash-lite", // Stable + économique
+      "gemini-2.5-flash-lite", // Stable + Ã©conomique
       "gemini-2.5-pro", // Stable + puissant
     ];
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    let lastError = null;
-
     const isRefinement = sessionId?.includes("refinement-");
-    const isContinuation = input.includes("CONTINUE LA DOCUMENTATION");
+    const isContinuation = input?.includes("CONTINUE LA DOCUMENTATION");
 
     const maxTokens = isContinuation ? 6000 : isRefinement ? 8000 : 6000;
 
     for (const currentModelName of modelsToTry) {
       try {
-        console.log(`🔄 Tentative avec: ${currentModelName}`);
+        console.log(`ðŸ”„ Tentative avec: ${currentModelName}`);
 
         const modelConfig = {
           model: currentModelName,
           systemInstruction: SYSTEM_INSTRUCTION,
         };
 
-        // 🆕 AJOUTER STRUCTURED OUTPUT SI APPLICABLE
+        // ðŸ†• AJOUTER STRUCTURED OUTPUT SI APPLICABLE
         if (useStructuredOutput && hasGithub) {
           modelConfig.generationConfig = {
             responseMimeType: "application/json",
@@ -423,7 +425,7 @@ export async function POST(req) {
 
         // S'assurer que le premier message est 'user'
         if (cleanHistory.length > 0 && cleanHistory[0].role !== "user") {
-          console.warn("⚠️ Premier message n'est pas user, historique ignoré");
+          console.warn("âš ï¸ Premier message n'est pas user, historique ignorÃ©");
           cleanHistory.length = 0;
         }
 
@@ -558,11 +560,11 @@ if (enableStreaming) {
         }
 
         if (aiResponse) {
-          console.log(`✅ Succès avec: ${currentModelName}`);
+          console.log(`âœ… SuccÃ¨s avec: ${currentModelName}`);
           break;
         }
       } catch (error) {
-        console.error(`❌ Échec avec ${currentModelName}:`, error.message);
+        console.error(`âŒ Ã‰chec avec ${currentModelName}:`, error.message);
         lastError = error;
 
         if (error.status === 429 || error.status === 503) {
@@ -575,7 +577,7 @@ if (enableStreaming) {
 
     if (!aiResponse) {
       aiResponse =
-        "⚠️ Capacité d'analyse temporairement limitée. Réessayez dans quelques instants.";
+        "âš ï¸ CapacitÃ© d'analyse temporairement limitÃ©e. RÃ©essayez dans quelques instants.";
     }
 
     // POST-TRAITEMENT : Validation et correction Mermaid
@@ -593,7 +595,7 @@ if (enableStreaming) {
       aiResponse: aiResponse,
       hasGithubUrl: !!githubUrl,
       githubUrl: githubUrl,
-      // 🆕 METADATA SUPPLÉMENTAIRE
+      // ðŸ†• METADATA SUPPLÃ‰MENTAIRE
       bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
       componentsCount: githubContext ? extractComponentsFromCode(githubContext).length : 0,
       createdAt: serverTimestamp(),
@@ -602,7 +604,7 @@ if (enableStreaming) {
     return NextResponse.json({
       analysis: aiResponse,
       githubUrl: githubUrl,
-      // 🆕 DONNÉES SUPPLÉMENTAIRES POUR LE FRONTEND
+      // ðŸ†• DONNÃ‰ES SUPPLÃ‰MENTAIRES POUR LE FRONTEND
       metadata: {
         bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
         componentsFound: githubContext ? extractComponentsFromCode(githubContext).length : 0,
@@ -614,3 +616,4 @@ if (enableStreaming) {
     return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
   }
 }
+

@@ -1,19 +1,15 @@
 // REMPLACER src/components/GithubDocButton.js entièrement par :
 
 "use client";
-import { useState } from 'react';
-import { Github, Check, AlertCircle } from 'lucide-react';
+import { useState } from "react";
+import { Github, Check, AlertCircle } from "lucide-react";
 
-export default function GithubDocButton({ 
-  githubUrl, 
-  documentationContent,
-  onSuccess 
-}) {
-  const [status, setStatus] = useState('idle'); // idle, loading, success, error
+export default function GithubDocButton({ githubUrl, documentationContent, onSuccess }) {
+  const [status, setStatus] = useState("idle"); // idle, loading, success, error
 
   const handleSendToGithub = async () => {
-    setStatus('loading');
-    
+    setStatus("loading");
+
     try {
       // ✅ CORRECTION : Utiliser /api/github/commit (pas /api/github-update)
       const response = await fetch('/api/github/commit', {
@@ -22,43 +18,43 @@ export default function GithubDocButton({
         body: JSON.stringify({
           repoUrl: githubUrl,
           content: documentationContent,
-          fileName: 'CIRCUIT_DOCUMENTATION.md'
-        })
+          fileName: "CIRCUIT_DOCUMENTATION.md",
+        }),
       });
 
       if (response.ok) {
-        setStatus('success');
+        setStatus("success");
         onSuccess?.();
-        setTimeout(() => setStatus('idle'), 3000);
+        setTimeout(() => setStatus("idle"), 3000);
       } else {
         const error = await response.json();
         console.error('GitHub error:', error);
         throw new Error(error.error || 'Échec de l\'envoi');
       }
     } catch (error) {
-      console.error('Erreur GitHub:', error);
-      setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
+      console.error("Erreur GitHub:", error);
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
     }
   };
 
   const getButtonContent = () => {
     switch (status) {
-      case 'loading':
+      case "loading":
         return (
           <>
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             Envoi en cours...
           </>
         );
-      case 'success':
+      case "success":
         return (
           <>
             <Check className="w-4 h-4" />
             Documentation envoyée !
           </>
         );
-      case 'error':
+      case "error":
         return (
           <>
             <AlertCircle className="w-4 h-4" />
@@ -76,14 +72,15 @@ export default function GithubDocButton({
   };
 
   const getButtonClass = () => {
-    const base = "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200";
-    
+    const base =
+      "flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200";
+
     switch (status) {
-      case 'success':
+      case "success":
         return `${base} bg-green-500 text-white`;
-      case 'error':
+      case "error":
         return `${base} bg-red-500 text-white hover:bg-red-600`;
-      case 'loading':
+      case "loading":
         return `${base} bg-gray-400 text-white cursor-not-allowed`;
       default:
         return `${base} bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 shadow-lg hover:shadow-xl`;
@@ -105,10 +102,10 @@ export default function GithubDocButton({
           </p>
         </div>
       </div>
-      
+
       <button
         onClick={handleSendToGithub}
-        disabled={status === 'loading' || status === 'success'}
+        disabled={status === "loading" || status === "success"}
         className={getButtonClass()}
       >
         {getButtonContent()}
