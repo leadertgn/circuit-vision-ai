@@ -1,5 +1,3 @@
-// REMPLACER src/components/GithubDocButton.js entièrement par :
-
 "use client";
 import { useState } from "react";
 import { Github, Check, AlertCircle } from "lucide-react";
@@ -11,7 +9,6 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
     setStatus("loading");
 
     try {
-      // ✅ CORRECTION : Utiliser /api/github/commit (pas /api/github-update)
       const response = await fetch('/api/github/commit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,10 +26,10 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
       } else {
         const error = await response.json();
         console.error('GitHub error:', error);
-        throw new Error(error.error || 'Échec de l\'envoi');
+        throw new Error(error.error || 'Failed to send');
       }
     } catch (error) {
-      console.error("Erreur GitHub:", error);
+      console.error("GitHub Error:", error);
       setStatus("error");
       setTimeout(() => setStatus("idle"), 3000);
     }
@@ -44,28 +41,28 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
         return (
           <>
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Envoi en cours...
+            Sending...
           </>
         );
       case "success":
         return (
           <>
             <Check className="w-4 h-4" />
-            Documentation envoyée !
+            Documentation sent!
           </>
         );
       case "error":
         return (
           <>
             <AlertCircle className="w-4 h-4" />
-            Erreur - Réessayer
+            Error - Retry
           </>
         );
       default:
         return (
           <>
             <Github className="w-4 h-4" />
-            Envoyer la doc sur GitHub
+            Send doc to GitHub
           </>
         );
     }
@@ -95,10 +92,10 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
         </div>
         <div className="flex-1">
           <p className="text-sm font-semibold text-gray-200 mb-1">
-            📝 Documentation complète générée
+            📝 Complete documentation generated
           </p>
           <p className="text-xs text-gray-400">
-            La documentation technique est prête à être ajoutée à votre dépôt GitHub.
+            Technical documentation is ready to be added to your GitHub repository.
           </p>
         </div>
       </div>
@@ -113,13 +110,13 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
       
       {status === 'success' && (
         <p className="text-xs text-green-400 bg-green-900/30 px-3 py-1.5 rounded border border-green-700">
-          ✓ Fichier CIRCUIT_DOCUMENTATION.md créé dans votre repo
+          ✓ File CIRCUIT_DOCUMENTATION.md created in your repo
         </p>
       )}
       
       {status === 'error' && (
         <p className="text-xs text-red-400 bg-red-900/30 px-3 py-1.5 rounded border border-red-700">
-          ❌ Erreur : Vérifiez que GITHUB_TOKEN est configuré dans .env.local
+          ❌ Error: Check that GITHUB_TOKEN is configured in .env.local
         </p>
       )}
     </div>

@@ -175,6 +175,47 @@ Ne termine JAMAIS par "CircuitVision Ã  votre service" ou phrases similaires.
 Si le code mentionne des credentials (WiFi, API keys), rappelle de les configurer.
 `;
 
+// Helper: Extract Arduino code from markdown response for Wokwi simulator
+function extractArduinoCode(markdownResponse) {
+  // Pattern 1: Code blocks with arduino, cpp, or no language specified
+  const codeBlockRegex = /```(?:arduino|cpp)?\n([\s\S]*?)```/g;
+  const matches = [...markdownResponse.matchAll(codeBlockRegex)];
+
+  if (matches.length > 0) {
+    // Return the first substantial code block (likely the main sketch)
+    for (const match of matches) {
+      const code = match[1].trim();
+      // Skip if it's just documentation or mermaid code
+      if (code.length > 100 && !code.startsWith("graph") && !code.startsWith("flowchart")) {
+        return code;
+      }
+    }
+    return matches[0][1].trim();
+  }
+
+  // Pattern 2: Look for setup/loop patterns
+  const setupLoopRegex = /(void\s+setup\s*\(\)[\s\S]*?void\s+loop\s*\([\s\S]*?\})/g;
+  const setupMatch = markdownResponse.match(setupLoopRegex);
+  if (setupMatch) {
+    return setupMatch[1];
+  }
+
+  // Pattern 3: Look for Arduino-specific keywords
+  const arduinoKeywords = ["#include <Arduino.h>", "Serial.begin", "pinMode", "digitalWrite"];
+  for (const keyword of arduinoKeywords) {
+    const idx = markdownResponse.indexOf(keyword);
+    if (idx !== -1) {
+      // Extract ~500 chars around the keyword
+      const start = Math.max(0, idx - 100);
+      const end = Math.min(markdownResponse.length, idx + 500);
+      return markdownResponse.substring(start, end);
+    }
+  }
+
+  // Fallback: Return empty or try to extract from githubContext directly
+  return "";
+}
+
 export async function POST(req) {
   try {
     // ðŸš¨ RATE LIMITING CHECK
@@ -378,9 +419,9 @@ export async function POST(req) {
 
     let aiResponse = "";
     const modelsToTry = [
-    //  "gemini-3-flash-preview", instable 
-      "gemini-2.5-flash", // Stable + rapide
+      //  "gemini-3-flash-preview", instable
       "gemini-2.5-flash-lite", // Stable + Ã©conomique
+      "gemini-2.5-flash", // Stable + rapide
       "gemini-2.5-pro", // Stable + puissant
     ];
 
@@ -438,122 +479,136 @@ export async function POST(req) {
         };
 
         const chat = model.startChat(chatConfig);
-// REMPLACER la section streaming (ligne 325-390) dans src/app/api/analyze/route.js
+        // REMPLACER la section streaming (ligne 325-390) dans src/app/api/analyze/route.js
 
-if (enableStreaming) {
-  // MODE STREAMING SSE
-  const encoder = new TextEncoder();
+        if (enableStreaming) {
+          // MODE STREAMING SSE
+          const encoder = new TextEncoder();
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // 1. Envoyer status initial
-        controller.enqueue(
-          encoder.encode(`event: status\ndata: ${JSON.stringify({ message: "Analyse en cours..." })}\n\n`)
-        );
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                // 1. Envoyer status initial
+                controller.enqueue(
+                  encoder.encode(
+                    `event: status\ndata: ${JSON.stringify({ message: "Analyse en cours..." })}\n\n`
+                  )
+                );
 
-        // 2. Analyser et envoyer bugs si GitHub
-        if (githubContext) {
-          const hardwareAnalysis = analyzeHardwareCode(githubContext);
-          if (hardwareAnalysis.bugs.length > 0) {
-            controller.enqueue(
-              encoder.encode(
-                `event: bugs_detected\ndata: ${JSON.stringify({
-                  bugs: hardwareAnalysis.bugs,
-                  stats: hardwareAnalysis.stats
-                })}\n\n`
-              )
-            );
-          }
+                // 2. Analyser et envoyer bugs si GitHub
+                if (githubContext) {
+                  const hardwareAnalysis = analyzeHardwareCode(githubContext);
+                  if (hardwareAnalysis.bugs.length > 0) {
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: bugs_detected\ndata: ${JSON.stringify({
+                          bugs: hardwareAnalysis.bugs,
+                          stats: hardwareAnalysis.stats,
+                        })}\n\n`
+                      )
+                    );
+                  }
 
-          const components = extractComponentsFromCode(githubContext);
-          if (components.length > 0) {
-            const shoppingData = {
-              items: components.map((comp) => ({
-                component: comp,
-                quantity: 1,
-                estimated_price: "À rechercher",
-              })),
-            };
-            controller.enqueue(
-              encoder.encode(
-                `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
-              )
-            );
-          }
-        }
+                  const components = extractComponentsFromCode(githubContext);
+                  if (components.length > 0) {
+                    const shoppingData = {
+                      items: components.map((comp) => ({
+                        component: comp,
+                        quantity: 1,
+                        estimated_price: "À rechercher",
+                      })),
+                    };
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
+                      )
+                    );
+                  }
+                }
 
-        // 3. Stream Gemini response
-        const result = await chat.sendMessageStream(promptParts);
-        let fullResponse = "";
+                // 3. Stream Gemini response
+                const result = await chat.sendMessageStream(promptParts);
+                let fullResponse = "";
 
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          fullResponse += chunkText;
+                for await (const chunk of result.stream) {
+                  const chunkText = chunk.text();
+                  fullResponse += chunkText;
 
-          // Envoyer chunk (pas d'event, juste data)
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
-          );
-        }
+                  // Envoyer chunk (pas d'event, juste data)
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
+                  );
+                }
 
-        // 4. Post-traitement Mermaid
-        const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
-        fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
-          const sanitized = sanitizeMermaidCode(code);
-          return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
-        });
+                // 4. Post-traitement Mermaid
+                const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+                fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
+                  const sanitized = sanitizeMermaidCode(code);
+                  return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
+                });
 
-        // 5. Envoyer completion event
-        controller.enqueue(
-          encoder.encode(
-            `event: complete\ndata: ${JSON.stringify({
-              analysis: fullResponse,
-              githubUrl: githubUrl,
-              metadata: {
-                bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
-                componentsFound: githubContext ? extractComponentsFromCode(githubContext).length : 0,
-                platform: githubContext ? detectPlatformType(githubContext).type : "unknown",
-              },
-            })}\n\n`
-          )
-        );
+                // 5. Envoyer completion event
+                // Extraire le code Arduino pour le simulateur
+                const arduinoCode = extractArduinoCode(fullResponse);
 
-        // 6. Sauvegarder Firestore (async, ne bloque pas)
-        addDoc(collection(db, "chats"), {
-          sessionId: sessionId || "anonyme",
-          type: isCompare ? "audit" : "simple",
-          userQuery: input,
-          aiResponse: fullResponse,
-          hasGithubUrl: !!githubUrl,
-          githubUrl: githubUrl,
-          bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
-          componentsCount: githubContext ? extractComponentsFromCode(githubContext).length : 0,
-          createdAt: serverTimestamp(),
-        }).catch(console.error);
+                controller.enqueue(
+                  encoder.encode(
+                    `event: complete\ndata: ${JSON.stringify({
+                      analysis: fullResponse,
+                      githubUrl: githubUrl,
+                      arduinoCode: arduinoCode, // Code Arduino pur pour Wokwi
+                      metadata: {
+                        bugsFound: githubContext
+                          ? analyzeHardwareCode(githubContext).bugs.length
+                          : 0,
+                        componentsFound: githubContext
+                          ? extractComponentsFromCode(githubContext).length
+                          : 0,
+                        platform: githubContext
+                          ? detectPlatformType(githubContext).type
+                          : "unknown",
+                      },
+                    })}\n\n`
+                  )
+                );
 
-        controller.close();
-      } catch (err) {
-        console.error("❌ Stream error:", err);
-        controller.enqueue(
-          encoder.encode(
-            `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`
-          )
-        );
-        controller.error(err);
-      }
-    },
-  });
+                // 6. Sauvegarder Firestore (async, ne bloque pas)
+                addDoc(collection(db, "chats"), {
+                  sessionId: sessionId || "anonyme",
+                  type: isCompare ? "audit" : "simple",
+                  userQuery: input,
+                  aiResponse: fullResponse,
+                  hasGithubUrl: !!githubUrl,
+                  githubUrl: githubUrl,
+                  bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
+                  componentsCount: githubContext
+                    ? extractComponentsFromCode(githubContext).length
+                    : 0,
+                  createdAt: serverTimestamp(),
+                }).catch(console.error);
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // Nginx unbuffering
-    },
-  });
-} else {
+                controller.close();
+              } catch (err) {
+                console.error("❌ Stream error:", err);
+                controller.enqueue(
+                  encoder.encode(
+                    `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`
+                  )
+                );
+                controller.error(err);
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no", // Nginx unbuffering
+            },
+          });
+        } else {
           // MODE NORMAL (JSON) - continue jusqu'à la fin de la fonction
           const result = await chat.sendMessage(promptParts);
           aiResponse = result.response.text();
@@ -601,9 +656,13 @@ if (enableStreaming) {
       createdAt: serverTimestamp(),
     }).catch(console.error);
 
+    // Extraire le code Arduino pour le simulateur
+    const arduinoCode = extractArduinoCode(aiResponse);
+
     return NextResponse.json({
       analysis: aiResponse,
       githubUrl: githubUrl,
+      arduinoCode: arduinoCode, // Code Arduino pur pour Wokwi
       // ðŸ†• DONNÃ‰ES SUPPLÃ‰MENTAIRES POUR LE FRONTEND
       metadata: {
         bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
@@ -616,4 +675,3 @@ if (enableStreaming) {
     return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
   }
 }
-

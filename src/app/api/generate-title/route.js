@@ -8,8 +8,8 @@ import { z } from "zod";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const MODELS = [
-  "gemini-2.5-flash", // Stable + rapide
   "gemini-2.5-flash-lite", // Stable + économique
+  "gemini-2.5-flash", // Stable + rapide
   "gemini-2.5-pro", // Stable + puissant
 ];
 

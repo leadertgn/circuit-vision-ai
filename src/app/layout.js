@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "CircuitVision AI - Documentation Hardware Automatique | Gemini 3",
-  description: "Générez documentation technique complète, détectez bugs hardware et créez shopping lists en < 30 secondes avec Gemini 3. Économisez 95% de votre temps sur vos projets embarqués.",
+  title: "CircuitVision AI - Automated Hardware Documentation | Gemini 2.5",
+  description: "Generate complete technical documentation, detect hardware bugs, and create shopping lists in under 30 seconds with Gemini 2.5. Save 95% of your time on embedded projects.",
   keywords: [
     "circuit documentation",
     "hardware analysis",
@@ -22,7 +22,7 @@ export const metadata = {
     "Arduino",
     "Raspberry Pi",
     "bug detection",
-    "Gemini 3",
+    "Gemini 2.5",
     "AI documentation",
     "IoT",
     "electronics",
@@ -40,25 +40,25 @@ export const metadata = {
     },
   },
   openGraph: {
-    title: "CircuitVision AI - Documentation Hardware en 25 secondes",
-    description: "Bug detection automatique + Shopping list + Documentation complète avec Gemini 3",
+    title: "CircuitVision AI - Automated Hardware Documentation in 25 seconds",
+    description: "Automatic bug detection + Shopping list + Complete documentation with Gemini 2.5",
     url: "https://circuitvision.ai",
     siteName: "CircuitVision AI",
-    locale: "fr_FR",
+    locale: "en_US",
     type: "website",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "CircuitVision AI - Documentation Hardware Automatique",
+        alt: "CircuitVision AI - Automated Hardware Documentation",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CircuitVision AI - Documentation Hardware en 25 secondes",
-    description: "Bug detection automatique + Shopping list + Documentation complète",
+    title: "CircuitVision AI - Automated Hardware Documentation in 25 seconds",
+    description: "Automatic bug detection + Shopping list + Complete documentation",
     creator: "@circuitvision",
     images: ["/og-image.jpg"],
   },
@@ -71,13 +71,13 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="fr">
+    <html lang="en">
       <head>
-        {/* Preconnect pour optimiser le chargement */}
+        {/* Preconnect for optimized loading */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         
-        {/* Favicon (ajouter ces fichiers dans /public) */}
+        {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         
@@ -87,7 +87,7 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         
-        {/* Google Analytics (optionnel - décommenter et ajouter ton ID) */}
+        {/* Google Analytics (optional - uncomment and add your ID) */}
         {/* <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"
           strategy="afterInteractive"
