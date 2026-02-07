@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { getSessionId } from "@/lib/session";
 import { useGithubDocButton } from "@/hooks/useGithubDocButton";
+import { useLanguage } from "@/hooks/useLanguage";
 import { extractComponentsFromCode } from "@/lib/component-search";
 
 // Components
@@ -128,6 +129,9 @@ export default function Home() {
     messages,
     activeChatId
   );
+  
+  // Language detection hook
+  const { language: userLanguage, isLoading: langLoading } = useLanguage();
 
   // Firebase subscriptions
   useEffect(() => {
@@ -255,6 +259,7 @@ export default function Home() {
           sessionId: chatId,
           history,
           enableStreaming,
+          userLanguage,
         }),
       });
 

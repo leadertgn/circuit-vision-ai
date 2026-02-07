@@ -40,6 +40,175 @@ function checkRateLimit(ip) {
   return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - windowData.count };
 }
 
+// MULTILINGUAL PROMPTS - Auto-detect language
+const LANGUAGE_PROMPTS = {
+  en: {
+    role: "You are CircuitVision AI, an Expert in Embedded Systems.",
+    mermaidNote: "NOTE: Use ONLY flowchart TD with alphanumeric IDs. NO flowchart LR.",
+    stopMessage: "STOP after section 8. Generate NO additional content.",
+    langNote: "LANGUAGE: English only",
+    statusMessage: "Analysis in progress...",
+    bugsMessage: "HARDWARE BUGS DETECTED:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} bugs found (${critical} critical, ${warnings} warnings)`,
+    bugsIntegration: "Integrate these bugs in your \"Testing & Troubleshooting\" section with their solutions.",
+    componentsMessage: "DETECTED COMPONENTS:",
+    componentsInstruction: "Include these in a \"Shopping List\" section.",
+    platformMessage: "DETECTED PLATFORM:",
+    platformInstruction: "Adapt your documentation for this platform.",
+    githubCode: "GITHUB PROJECT SOURCE CODE:",
+    sections: `
+## 1. Overview
+Objective (2-3 sentences) + Architecture
+
+## 2. Hardware Components
+Table: Component | Pin | Function | Notes
+
+## 3. Pin Configuration
+Extracted #define code
+
+## 4. Libraries
+#include list with purposes
+
+## 5. Code Logic
+setup(), loop(), critical functions
+
+## 6. Wiring Diagram
+Mermaid diagram (flowchart TD only)
+
+## 7. Installation
+Concrete steps
+
+## 8. Testing & Troubleshooting
+Checkpoints
+`
+  },
+  fr: {
+    role: "Tu es CircuitVision AI, Expert en Systemes Embarques.",
+    mermaidNote: "NOTE: Utilise UNIQUEMENT flowchart TD avec IDs alphanumeriques. PAS flowchart LR.",
+    stopMessage: "STOP apres la section 8. Ne genere AUCUN contenu supplementaire.",
+    langNote: "LANGUE: Francais uniquement",
+    statusMessage: "Analyse en cours...",
+    bugsMessage: "BUGS HARDWARE DETECTES:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} bugs trouves (${critical} critiques, ${warnings} avertissements)`,
+    bugsIntegration: "Integre ces bugs dans ta section \"Tests et Depannage\" avec leurs solutions.",
+    componentsMessage: "COMPOSANTS DETECTES:",
+    componentsInstruction: "Cree une section \"Shopping List\" avec ces composants.",
+    platformMessage: "PLATEFORME DETECTEE:",
+    platformInstruction: "Adapte ta documentation pour cette plateforme.",
+    githubCode: "CODE SOURCE DU PROJET GITHUB:",
+    sections: `
+## 1. Vue d'ensemble
+Objectif (2-3 phrases) + Architecture
+
+## 2. Composants Hardware
+Tableau: Composant | Pin | Fonction | Notes
+
+## 3. Configuration des Pins
+Code #define extrait
+
+## 4. Bibliotheques
+Liste #include avec roles
+
+## 5. Logique du Code
+setup(), loop(), fonctions critiques
+
+## 6. Schema de Cablage
+Diagramme Mermaid (flowchart TD uniquement)
+
+## 7. Installation
+Etapes concretes
+
+## 8. Tests et Depannage
+Points de controle
+`
+  },
+  es: {
+    role: "Eres CircuitVision AI, un Experto en Sistemas Embebidos.",
+    mermaidNote: "NOTA: Usa SOLO flowchart TD con IDs alfanumericos. SIN flowchart LR.",
+    stopMessage: "STOP despues de la seccion 8. NO generes contenido adicional.",
+    langNote: "IDIOMA: Espanol unicamente",
+    statusMessage: "Analisis en progreso...",
+    bugsMessage: "ERRORES DE HARDWARE DETECTADOS:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} errores encontrados (${critical} criticos, ${warnings} advertencias)`,
+    bugsIntegration: "Integra estos errores en tu seccion \"Pruebas y Solucion\" con sus soluciones.",
+    componentsMessage: "COMPONENTES DETECTADOS:",
+    componentsInstruction: "Incluye estos en una seccion \"Lista de Compras\".",
+    platformMessage: "PLATAFORMA DETECTADA:",
+    platformInstruction: "Adapta tu documentacion para esta plataforma.",
+    githubCode: "CODIGO FUENTE DEL PROYECTO GITHUB:",
+    sections: `
+## 1. Vision General
+Objetivo (2-3 oraciones) + Arquitectura
+
+## 2. Componentes de Hardware
+Tabla: Componente | Pin | Funcion | Notas
+
+## 3. Configuracion de Pines
+Codigo #define extraido
+
+## 4. Librerias
+Lista #include con propositos
+
+## 5. Logica del Codigo
+setup(), loop(), funciones criticas
+
+## 6. Diagrama de Cableado
+Diagrama Mermaid (flowchart TD unicamente)
+
+## 7. Instalacion
+Pasos concretos
+
+## 8. Pruebas y Solucion de Problemas
+Puntos de control
+`
+  }
+};
+
+// Build system instruction based on detected language
+function buildSystemInstruction(userLanguage = 'en') {
+  const lang = LANGUAGE_PROMPTS[userLanguage] || LANGUAGE_PROMPTS['en'];
+  
+  return `
+${lang.role}
+
+You can analyze:
+1. SOURCE CODE (Arduino, ESP32, etc.)
+2. IMAGES of PCB circuits
+3. VIDEOS of hardware setups
+
+For IMAGES/VIDEOS:
+- Describe visible components
+- Propose wiring diagram
+- Ask for code if available
+
+NEVER:
+- Invent information not present in code
+- Mention components not in code
+- Speculate on architecture if unclear
+- Generate multiple versions
+- Repeat yourself
+
+ALWAYS:
+- Analyze ONLY provided source code
+- Stay factual and precise
+- Cite files and line numbers
+- Be concise and direct
+
+${lang.mermaidNote}
+
+MANDATORY STRUCTURE (8 SECTIONS MAX):
+
+${lang.sections}
+
+${lang.stopMessage}
+
+${lang.langNote}
+`;
+}
+
 const SYSTEM_INSTRUCTION = `
 Tu es CircuitVision AI, Expert en SystÃ¨mes EmbarquÃ©s.
 
@@ -253,6 +422,7 @@ export async function POST(req) {
       sessionId,
       history,
       enableStreaming = false,
+      userLanguage = 'en',
     } = data;
 
     console.log("=== API ANALYZE ===");
@@ -436,7 +606,7 @@ export async function POST(req) {
 
         const modelConfig = {
           model: currentModelName,
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: buildSystemInstruction(userLanguage),
         };
 
         // ðŸ†• AJOUTER STRUCTURED OUTPUT SI APPLICABLE
