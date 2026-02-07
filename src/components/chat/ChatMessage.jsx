@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import Mermaid from "@/components/Mermaid";
+import GithubDocButton from "@/components/GithubDocButton";
 import { Copy, Check, AlertCircle } from "lucide-react";
 
 export function ChatMessage({ message }) {
@@ -24,25 +25,25 @@ export function ChatMessage({ message }) {
         {message.files.map((file, index) => (
           <div key={index} className="relative group">
             {file.type?.startsWith("image") ? (
-              <img 
-                src={file.url} 
-                alt={`Fichier ${index + 1}`}
+              <img
+                src={file.url}
+                alt={`File ${index + 1}`}
                 className="max-w-xs max-h-48 rounded-lg border border-gray-700"
               />
             ) : file.type?.startsWith("video") ? (
-              <video 
-                src={file.url} 
+              <video
+                src={file.url}
                 controls
                 className="max-w-xs max-h-48 rounded-lg border border-gray-700"
               />
             ) : (
-              <a 
-                href={file.url} 
-                target="_blank" 
+              <a
+                href={file.url}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-purple-400 hover:text-purple-300 text-sm"
               >
-                📎 {file.name || "Fichier"}
+                📎 {file.name || "File"}
               </a>
             )}
           </div>
@@ -54,9 +55,11 @@ export function ChatMessage({ message }) {
   return (
     <div className={`flex gap-4 p-4 ${isUser ? "bg-gray-900/50" : "bg-transparent"}`}>
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-        isUser ? "bg-gray-700" : "bg-gradient-to-br from-purple-500 to-blue-500"
-      }`}>
+      <div
+        className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+          isUser ? "bg-gray-700" : "bg-gradient-to-br from-purple-500 to-blue-500"
+        }`}
+      >
         {isUser ? (
           <span className="text-sm font-medium text-white">U</span>
         ) : (
@@ -96,7 +99,11 @@ export function ChatMessage({ message }) {
                             className="absolute top-2 right-2 p-1 rounded bg-gray-700/50 opacity-0 group-hover:opacity-100 transition-opacity"
                             title="Copy code"
                           >
-                            {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                            {copied ? (
+                              <Check className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <Copy className="w-4 h-4 text-gray-400" />
+                            )}
                           </button>
                         )}
                       </div>
@@ -119,9 +126,20 @@ export function ChatMessage({ message }) {
                 )}
                 {message.componentsFound > 0 && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">
-                    {message.componentsFound} composant{message.componentsFound > 1 ? "s" : ""}
+                    {message.componentsFound} component{message.componentsFound > 1 ? "s" : ""}
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* GitHub Doc Button - Show when documentation is complete and has GitHub URL */}
+            {!isUser && message.githubUrl && (
+              <div className="mt-4">
+                <GithubDocButton
+                  githubUrl={message.githubUrl}
+                  documentationContent={message.text}
+                  onSuccess={() => console.log("Documentation sent to GitHub!")}
+                />
               </div>
             )}
           </div>

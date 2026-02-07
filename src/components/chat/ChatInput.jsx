@@ -64,7 +64,7 @@ export function ChatInput({
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-              title="Attacher un fichier"
+              title="Attach file"
             >
               <Paperclip className="w-5 h-5" />
             </button>
@@ -72,7 +72,7 @@ export function ChatInput({
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                title="Photo du circuit réel"
+                title="Real circuit photo"
               >
                 <FileVideo className="w-5 h-5" />
               </button>
@@ -86,7 +86,7 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            placeholder="Collez un lien GitHub ou décrivez votre circuit..."
+            placeholder="Paste a GitHub URL or describe your circuit..."
             className="flex-1 bg-transparent text-white placeholder-gray-500 resize-none focus:outline-none max-h-48"
             rows={1}
             disabled={loading}
@@ -118,7 +118,7 @@ export function ChatInput({
 
         {/* Help text */}
         <p className="text-center text-xs text-gray-500 mt-2">
-          Appuyez sur Entrée pour envoyer, Maj+Entrée pour nouvelle ligne
+          Press Enter to send, Shift+Enter for new line
         </p>
       </div>
     </div>

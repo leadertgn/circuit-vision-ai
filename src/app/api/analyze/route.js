@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { sanitizeMermaidCode } from "@/lib/mermaid-validator";
 import { extractGithubUrl } from "@/lib/doc-completion-detector";
 import { analyzeHardwareCode } from "@/lib/hardware-validator";
-import { extractComponentsFromCode } from "@/lib/component-search";
+import { extractComponentsFromCode, searchComponentPrices } from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
 import { DocumentationSchema } from "@/lib/schemas";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -38,6 +38,175 @@ function checkRateLimit(ip) {
 
   windowData.count++;
   return { allowed: true, remaining: MAX_REQUESTS_PER_WINDOW - windowData.count };
+}
+
+// MULTILINGUAL PROMPTS - Auto-detect language
+const LANGUAGE_PROMPTS = {
+  en: {
+    role: "You are CircuitVision AI, an Expert in Embedded Systems.",
+    mermaidNote: "NOTE: Use ONLY flowchart TD with alphanumeric IDs. NO flowchart LR.",
+    stopMessage: "STOP after section 8. Generate NO additional content.",
+    langNote: "LANGUAGE: English only",
+    statusMessage: "Analysis in progress...",
+    bugsMessage: "HARDWARE BUGS DETECTED:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} bugs found (${critical} critical, ${warnings} warnings)`,
+    bugsIntegration: "Integrate these bugs in your \"Testing & Troubleshooting\" section with their solutions.",
+    componentsMessage: "DETECTED COMPONENTS:",
+    componentsInstruction: "Include these in a \"Shopping List\" section.",
+    platformMessage: "DETECTED PLATFORM:",
+    platformInstruction: "Adapt your documentation for this platform.",
+    githubCode: "GITHUB PROJECT SOURCE CODE:",
+    sections: `
+## 1. Overview
+Objective (2-3 sentences) + Architecture
+
+## 2. Hardware Components
+Table: Component | Pin | Function | Notes
+
+## 3. Pin Configuration
+Extracted #define code
+
+## 4. Libraries
+#include list with purposes
+
+## 5. Code Logic
+setup(), loop(), critical functions
+
+## 6. Wiring Diagram
+Mermaid diagram (flowchart TD only)
+
+## 7. Installation
+Concrete steps
+
+## 8. Testing & Troubleshooting
+Checkpoints
+`
+  },
+  fr: {
+    role: "Tu es CircuitVision AI, Expert en Systemes Embarques.",
+    mermaidNote: "NOTE: Utilise UNIQUEMENT flowchart TD avec IDs alphanumeriques. PAS flowchart LR.",
+    stopMessage: "STOP apres la section 8. Ne genere AUCUN contenu supplementaire.",
+    langNote: "LANGUE: Francais uniquement",
+    statusMessage: "Analyse en cours...",
+    bugsMessage: "BUGS HARDWARE DETECTES:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} bugs trouves (${critical} critiques, ${warnings} avertissements)`,
+    bugsIntegration: "Integre ces bugs dans ta section \"Tests et Depannage\" avec leurs solutions.",
+    componentsMessage: "COMPOSANTS DETECTES:",
+    componentsInstruction: "Cree une section \"Shopping List\" avec ces composants.",
+    platformMessage: "PLATEFORME DETECTEE:",
+    platformInstruction: "Adapte ta documentation pour cette plateforme.",
+    githubCode: "CODE SOURCE DU PROJET GITHUB:",
+    sections: `
+## 1. Vue d'ensemble
+Objectif (2-3 phrases) + Architecture
+
+## 2. Composants Hardware
+Tableau: Composant | Pin | Fonction | Notes
+
+## 3. Configuration des Pins
+Code #define extrait
+
+## 4. Bibliotheques
+Liste #include avec roles
+
+## 5. Logique du Code
+setup(), loop(), fonctions critiques
+
+## 6. Schema de Cablage
+Diagramme Mermaid (flowchart TD uniquement)
+
+## 7. Installation
+Etapes concretes
+
+## 8. Tests et Depannage
+Points de controle
+`
+  },
+  es: {
+    role: "Eres CircuitVision AI, un Experto en Sistemas Embebidos.",
+    mermaidNote: "NOTA: Usa SOLO flowchart TD con IDs alfanumericos. SIN flowchart LR.",
+    stopMessage: "STOP despues de la seccion 8. NO generes contenido adicional.",
+    langNote: "IDIOMA: Espanol unicamente",
+    statusMessage: "Analisis en progreso...",
+    bugsMessage: "ERRORES DE HARDWARE DETECTADOS:",
+    bugsCount: (total, critical, warnings) => 
+      `${total} errores encontrados (${critical} criticos, ${warnings} advertencias)`,
+    bugsIntegration: "Integra estos errores en tu seccion \"Pruebas y Solucion\" con sus soluciones.",
+    componentsMessage: "COMPONENTES DETECTADOS:",
+    componentsInstruction: "Incluye estos en una seccion \"Lista de Compras\".",
+    platformMessage: "PLATAFORMA DETECTADA:",
+    platformInstruction: "Adapta tu documentacion para esta plataforma.",
+    githubCode: "CODIGO FUENTE DEL PROYECTO GITHUB:",
+    sections: `
+## 1. Vision General
+Objetivo (2-3 oraciones) + Arquitectura
+
+## 2. Componentes de Hardware
+Tabla: Componente | Pin | Funcion | Notas
+
+## 3. Configuracion de Pines
+Codigo #define extraido
+
+## 4. Librerias
+Lista #include con propositos
+
+## 5. Logica del Codigo
+setup(), loop(), funciones criticas
+
+## 6. Diagrama de Cableado
+Diagrama Mermaid (flowchart TD unicamente)
+
+## 7. Instalacion
+Pasos concretos
+
+## 8. Pruebas y Solucion de Problemas
+Puntos de control
+`
+  }
+};
+
+// Build system instruction based on detected language
+function buildSystemInstruction(userLanguage = 'en') {
+  const lang = LANGUAGE_PROMPTS[userLanguage] || LANGUAGE_PROMPTS['en'];
+  
+  return `
+${lang.role}
+
+You can analyze:
+1. SOURCE CODE (Arduino, ESP32, etc.)
+2. IMAGES of PCB circuits
+3. VIDEOS of hardware setups
+
+For IMAGES/VIDEOS:
+- Describe visible components
+- Propose wiring diagram
+- Ask for code if available
+
+NEVER:
+- Invent information not present in code
+- Mention components not in code
+- Speculate on architecture if unclear
+- Generate multiple versions
+- Repeat yourself
+
+ALWAYS:
+- Analyze ONLY provided source code
+- Stay factual and precise
+- Cite files and line numbers
+- Be concise and direct
+
+${lang.mermaidNote}
+
+MANDATORY STRUCTURE (8 SECTIONS MAX):
+
+${lang.sections}
+
+${lang.stopMessage}
+
+${lang.langNote}
+`;
 }
 
 const SYSTEM_INSTRUCTION = `
@@ -175,6 +344,47 @@ Ne termine JAMAIS par "CircuitVision Ã  votre service" ou phrases similaires.
 Si le code mentionne des credentials (WiFi, API keys), rappelle de les configurer.
 `;
 
+// Helper: Extract Arduino code from markdown response for Wokwi simulator
+function extractArduinoCode(markdownResponse) {
+  // Pattern 1: Code blocks with arduino, cpp, or no language specified
+  const codeBlockRegex = /```(?:arduino|cpp)?\n([\s\S]*?)```/g;
+  const matches = [...markdownResponse.matchAll(codeBlockRegex)];
+
+  if (matches.length > 0) {
+    // Return the first substantial code block (likely the main sketch)
+    for (const match of matches) {
+      const code = match[1].trim();
+      // Skip if it's just documentation or mermaid code
+      if (code.length > 100 && !code.startsWith("graph") && !code.startsWith("flowchart")) {
+        return code;
+      }
+    }
+    return matches[0][1].trim();
+  }
+
+  // Pattern 2: Look for setup/loop patterns
+  const setupLoopRegex = /(void\s+setup\s*\(\)[\s\S]*?void\s+loop\s*\([\s\S]*?\})/g;
+  const setupMatch = markdownResponse.match(setupLoopRegex);
+  if (setupMatch) {
+    return setupMatch[1];
+  }
+
+  // Pattern 3: Look for Arduino-specific keywords
+  const arduinoKeywords = ["#include <Arduino.h>", "Serial.begin", "pinMode", "digitalWrite"];
+  for (const keyword of arduinoKeywords) {
+    const idx = markdownResponse.indexOf(keyword);
+    if (idx !== -1) {
+      // Extract ~500 chars around the keyword
+      const start = Math.max(0, idx - 100);
+      const end = Math.min(markdownResponse.length, idx + 500);
+      return markdownResponse.substring(start, end);
+    }
+  }
+
+  // Fallback: Return empty or try to extract from githubContext directly
+  return "";
+}
+
 export async function POST(req) {
   try {
     // ðŸš¨ RATE LIMITING CHECK
@@ -212,6 +422,7 @@ export async function POST(req) {
       sessionId,
       history,
       enableStreaming = false,
+      userLanguage = 'en',
     } = data;
 
     console.log("=== API ANALYZE ===");
@@ -258,9 +469,20 @@ export async function POST(req) {
           // ðŸ†• GÃ‰NÃ‰RATION SHOPPING LIST
           const components = extractComponentsFromCode(githubContext);
           if (components.length > 0) {
-            promptParts.push({
-              text: `\nðŸ›’ COMPOSANTS DÃ‰TECTÃ‰S : ${components.join(", ")}\n\nCrÃ©e une section "Shopping List" avec ces composants.`,
-            });
+            console.log(`Shopping list: Found ${components.length} components`);
+            
+            // Search for real prices using Google Search
+            const shoppingResult = await searchComponentPrices(components, userLanguage);
+            
+            if (shoppingResult.success && shoppingResult.markdown) {
+              promptParts.push({
+                text: shoppingResult.markdown,
+              });
+            } else {
+              promptParts.push({
+                text: `\nCOMPOSANTS DETECTES : ${components.join(", ")}\n\nCree une section "Shopping List" avec ces composants.`,
+              });
+            }
           }
 
           // ðŸ†• DÃ‰TECTION PLATEFORME
@@ -378,9 +600,9 @@ export async function POST(req) {
 
     let aiResponse = "";
     const modelsToTry = [
-    //  "gemini-3-flash-preview", instable 
-      "gemini-2.5-flash", // Stable + rapide
+      //"gemini-3-flash-preview", instable
       "gemini-2.5-flash-lite", // Stable + Ã©conomique
+      "gemini-2.5-flash", // Stable + rapide
       "gemini-2.5-pro", // Stable + puissant
     ];
 
@@ -395,11 +617,12 @@ export async function POST(req) {
 
         const modelConfig = {
           model: currentModelName,
-          systemInstruction: SYSTEM_INSTRUCTION,
+          systemInstruction: buildSystemInstruction(userLanguage),
         };
 
         // ðŸ†• AJOUTER STRUCTURED OUTPUT SI APPLICABLE
         if (useStructuredOutput && hasGithub) {
+          console.log("📋 Using structured output for GitHub analysis");
           modelConfig.generationConfig = {
             responseMimeType: "application/json",
             responseSchema: zodToJsonSchema(DocumentationSchema),
@@ -438,122 +661,136 @@ export async function POST(req) {
         };
 
         const chat = model.startChat(chatConfig);
-// REMPLACER la section streaming (ligne 325-390) dans src/app/api/analyze/route.js
+        // REMPLACER la section streaming (ligne 325-390) dans src/app/api/analyze/route.js
 
-if (enableStreaming) {
-  // MODE STREAMING SSE
-  const encoder = new TextEncoder();
+        if (enableStreaming) {
+          // MODE STREAMING SSE
+          const encoder = new TextEncoder();
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // 1. Envoyer status initial
-        controller.enqueue(
-          encoder.encode(`event: status\ndata: ${JSON.stringify({ message: "Analyse en cours..." })}\n\n`)
-        );
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                // 1. Envoyer status initial
+                controller.enqueue(
+                  encoder.encode(
+                    `event: status\ndata: ${JSON.stringify({ message: "Analyse en cours..." })}\n\n`
+                  )
+                );
 
-        // 2. Analyser et envoyer bugs si GitHub
-        if (githubContext) {
-          const hardwareAnalysis = analyzeHardwareCode(githubContext);
-          if (hardwareAnalysis.bugs.length > 0) {
-            controller.enqueue(
-              encoder.encode(
-                `event: bugs_detected\ndata: ${JSON.stringify({
-                  bugs: hardwareAnalysis.bugs,
-                  stats: hardwareAnalysis.stats
-                })}\n\n`
-              )
-            );
-          }
+                // 2. Analyser et envoyer bugs si GitHub
+                if (githubContext) {
+                  const hardwareAnalysis = analyzeHardwareCode(githubContext);
+                  if (hardwareAnalysis.bugs.length > 0) {
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: bugs_detected\ndata: ${JSON.stringify({
+                          bugs: hardwareAnalysis.bugs,
+                          stats: hardwareAnalysis.stats,
+                        })}\n\n`
+                      )
+                    );
+                  }
 
-          const components = extractComponentsFromCode(githubContext);
-          if (components.length > 0) {
-            const shoppingData = {
-              items: components.map((comp) => ({
-                component: comp,
-                quantity: 1,
-                estimated_price: "À rechercher",
-              })),
-            };
-            controller.enqueue(
-              encoder.encode(
-                `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
-              )
-            );
-          }
-        }
+                  const components = extractComponentsFromCode(githubContext);
+                  if (components.length > 0) {
+                    const shoppingData = {
+                      items: components.map((comp) => ({
+                        component: comp,
+                        quantity: 1,
+                        estimated_price: "À rechercher",
+                      })),
+                    };
+                    controller.enqueue(
+                      encoder.encode(
+                        `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
+                      )
+                    );
+                  }
+                }
 
-        // 3. Stream Gemini response
-        const result = await chat.sendMessageStream(promptParts);
-        let fullResponse = "";
+                // 3. Stream Gemini response
+                const result = await chat.sendMessageStream(promptParts);
+                let fullResponse = "";
 
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          fullResponse += chunkText;
+                for await (const chunk of result.stream) {
+                  const chunkText = chunk.text();
+                  fullResponse += chunkText;
 
-          // Envoyer chunk (pas d'event, juste data)
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
-          );
-        }
+                  // Envoyer chunk (pas d'event, juste data)
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ text: chunkText })}\n\n`)
+                  );
+                }
 
-        // 4. Post-traitement Mermaid
-        const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
-        fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
-          const sanitized = sanitizeMermaidCode(code);
-          return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
-        });
+                // 4. Post-traitement Mermaid
+                const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+                fullResponse = fullResponse.replace(mermaidRegex, (match, code) => {
+                  const sanitized = sanitizeMermaidCode(code);
+                  return sanitized ? `\`\`\`mermaid\n${sanitized}\n\`\`\`` : match;
+                });
 
-        // 5. Envoyer completion event
-        controller.enqueue(
-          encoder.encode(
-            `event: complete\ndata: ${JSON.stringify({
-              analysis: fullResponse,
-              githubUrl: githubUrl,
-              metadata: {
-                bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
-                componentsFound: githubContext ? extractComponentsFromCode(githubContext).length : 0,
-                platform: githubContext ? detectPlatformType(githubContext).type : "unknown",
-              },
-            })}\n\n`
-          )
-        );
+                // 5. Envoyer completion event
+                // Extraire le code Arduino pour le simulateur
+                const arduinoCode = extractArduinoCode(fullResponse);
 
-        // 6. Sauvegarder Firestore (async, ne bloque pas)
-        addDoc(collection(db, "chats"), {
-          sessionId: sessionId || "anonyme",
-          type: isCompare ? "audit" : "simple",
-          userQuery: input,
-          aiResponse: fullResponse,
-          hasGithubUrl: !!githubUrl,
-          githubUrl: githubUrl,
-          bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
-          componentsCount: githubContext ? extractComponentsFromCode(githubContext).length : 0,
-          createdAt: serverTimestamp(),
-        }).catch(console.error);
+                controller.enqueue(
+                  encoder.encode(
+                    `event: complete\ndata: ${JSON.stringify({
+                      analysis: fullResponse,
+                      githubUrl: githubUrl,
+                      arduinoCode: arduinoCode, // Code Arduino pur pour Wokwi
+                      metadata: {
+                        bugsFound: githubContext
+                          ? analyzeHardwareCode(githubContext).bugs.length
+                          : 0,
+                        componentsFound: githubContext
+                          ? extractComponentsFromCode(githubContext).length
+                          : 0,
+                        platform: githubContext
+                          ? detectPlatformType(githubContext).type
+                          : "unknown",
+                      },
+                    })}\n\n`
+                  )
+                );
 
-        controller.close();
-      } catch (err) {
-        console.error("❌ Stream error:", err);
-        controller.enqueue(
-          encoder.encode(
-            `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`
-          )
-        );
-        controller.error(err);
-      }
-    },
-  });
+                // 6. Sauvegarder Firestore (async, ne bloque pas)
+                addDoc(collection(db, "chats"), {
+                  sessionId: sessionId || "anonyme",
+                  type: isCompare ? "audit" : "simple",
+                  userQuery: input,
+                  aiResponse: fullResponse,
+                  hasGithubUrl: !!githubUrl,
+                  githubUrl: githubUrl,
+                  bugsDetected: githubContext ? analyzeHardwareCode(githubContext).stats : null,
+                  componentsCount: githubContext
+                    ? extractComponentsFromCode(githubContext).length
+                    : 0,
+                  createdAt: serverTimestamp(),
+                }).catch(console.error);
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no", // Nginx unbuffering
-    },
-  });
-} else {
+                controller.close();
+              } catch (err) {
+                console.error("❌ Stream error:", err);
+                controller.enqueue(
+                  encoder.encode(
+                    `event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`
+                  )
+                );
+                controller.error(err);
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache, no-transform",
+              Connection: "keep-alive",
+              "X-Accel-Buffering": "no", // Nginx unbuffering
+            },
+          });
+        } else {
           // MODE NORMAL (JSON) - continue jusqu'à la fin de la fonction
           const result = await chat.sendMessage(promptParts);
           aiResponse = result.response.text();
@@ -601,9 +838,13 @@ if (enableStreaming) {
       createdAt: serverTimestamp(),
     }).catch(console.error);
 
+    // Extraire le code Arduino pour le simulateur
+    const arduinoCode = extractArduinoCode(aiResponse);
+
     return NextResponse.json({
       analysis: aiResponse,
       githubUrl: githubUrl,
+      arduinoCode: arduinoCode, // Code Arduino pur pour Wokwi
       // ðŸ†• DONNÃ‰ES SUPPLÃ‰MENTAIRES POUR LE FRONTEND
       metadata: {
         bugsFound: githubContext ? analyzeHardwareCode(githubContext).bugs.length : 0,
@@ -616,4 +857,3 @@ if (enableStreaming) {
     return NextResponse.json({ error: "Erreur technique." }, { status: 500 });
   }
 }
-

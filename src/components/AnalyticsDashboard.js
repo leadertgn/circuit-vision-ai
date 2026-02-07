@@ -36,32 +36,35 @@ export default function AnalyticsDashboard({ sessionId }) {
         ...doc.data(),
       }));
 
-      // Calculs des métriques
-      const totalAnalyses = chats.length;
-const totalBugsFound = chats.reduce((sum, chat) => {
-  if (chat.bugsDetected && chat.bugsDetected.stats) {
-    return sum + (chat.bugsDetected.stats.total || 0);
-  }
-  return sum;
-}, 0);     
- const totalComponents = chats.reduce((sum, chat) => sum + (chat.componentCount || 0), 0);
-      const githubCommits = chats.filter((chat) => chat.hasGithubUrl).length;
+      // Calculate metrics
+      const totalAnalyses = conversations.length;
+      const totalBugsFound = conversations.reduce((sum, chat) => {
+        if (chat.bugsDetected && chat.bugsDetected.stats) {
+          return sum + (chat.bugsDetected.stats.total || 0);
+        }
+        return sum;
+      }, 0);
+      const totalComponents = conversations.reduce(
+        (sum, chat) => sum + (chat.componentCount || 0),
+        0
+      );
+      const githubCommits = conversations.filter((chat) => chat.hasGithubUrl).length;
 
-      // Temps moyen d'analyse (estimé à 25s par analyse avec notre IA)
+      // Average analysis time (estimated at 25s per analysis)
       const avgAnalysisTime = 25;
 
-      // Calcul du temps économisé
-      // Sans CircuitVision : 2-3h de documentation manuelle par projet
-      // Avec CircuitVision : 25 secondes
-      const manualTimePerProject = 2.5 * 60 * 60; // 2.5h en secondes
-      const aiTimePerProject = 25; // secondes
+      // Calculate time saved
+      // Without CircuitVision: 2-3h manual documentation per project
+      // With CircuitVision: 25 seconds
+      const manualTimePerProject = 2.5 * 60 * 60; // 2.5h in seconds
+      const aiTimePerProject = 25; // seconds
       const timeSavedPerProject = manualTimePerProject - aiTimePerProject;
-      const totalTimeSaved = (timeSavedPerProject * totalAnalyses) / 3600; // en heures
+      const totalTimeSaved = (timeSavedPerProject * totalAnalyses) / 3600; // in hours
 
-      // Argent économisé (estimation : $50/h consultant)
+      // Money saved (estimate: $50/h consultant)
       const moneySaved = totalTimeSaved * 50;
 
-      // Projets récents
+      // Recent projects
       const recentProjects = conversations.slice(0, 5).map((conversation) => ({
         id: conversation.id,
         query: conversation.userQuery?.substring(0, 60) + "...",
@@ -84,7 +87,7 @@ const totalBugsFound = chats.reduce((sum, chat) => {
 
       setLoading(false);
     } catch (error) {
-      console.error("Erreur chargement analytics:", error);
+      console.error("Analytics loading error:", error);
       setLoading(false);
     }
   }, [sessionId]);
@@ -107,7 +110,7 @@ const totalBugsFound = chats.reduce((sum, chat) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white">📊 Dashboard</h2>
-          <p className="text-sm text-gray-400">Vos statistiques</p>
+          <p className="text-sm text-gray-400">Your statistics</p>
         </div>
         <button
           onClick={loadAnalytics}
@@ -117,34 +120,34 @@ const totalBugsFound = chats.reduce((sum, chat) => {
         </button>
       </div>
 
-      {/* Métriques principales */}
+      {/* Main metrics */}
       <div className="grid grid-cols-2 gap-2">
         <MetricCard icon={FileText} label="Analyses" value={stats.totalAnalyses} color="blue" />
         <MetricCard icon={Bug} label="Bugs" value={stats.totalBugsFound} color="red" />
         <MetricCard
           icon={ShoppingCart}
-          label="Composants"
+          label="Components"
           value={stats.totalComponents}
           color="green"
         />
         <MetricCard icon={Github} label="GitHub" value={stats.githubCommits} color="purple" />
       </div>
 
-      {/* Impact économique */}
+      {/* Economic impact */}
       <div className="grid grid-cols-2 gap-2">
         <ImpactCard
           icon={Clock}
-          title="Temps"
+          title="Time Saved"
           value={`${stats.timeSaved}h`}
-          subtitle={`vs ${stats.totalAnalyses * 2.5}h manuel`}
+          subtitle={`vs ${stats.totalAnalyses * 2.5}h manual`}
           percentage={95}
           color="blue"
         />
         <ImpactCard
           icon={Award}
-          title="Économies"
-          value={`$${stats.moneySaved}`}
-          subtitle="À $50/h"
+          title="Savings"
+          value={`${stats.moneySaved}`}
+          subtitle="At $50/h"
           percentage={100}
           color="green"
         />
@@ -159,7 +162,7 @@ const totalBugsFound = chats.reduce((sum, chat) => {
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-xl font-bold text-purple-400">{stats.avgAnalysisTime}s</p>
-            <p className="text-xs text-gray-400">Temps</p>
+            <p className="text-xs text-gray-400">Time</p>
           </div>
           <div>
             <p className="text-xl font-bold text-red-400">
@@ -167,7 +170,7 @@ const totalBugsFound = chats.reduce((sum, chat) => {
                 ? Math.round((stats.totalBugsFound / stats.totalAnalyses) * 10) / 10
                 : 0}
             </p>
-            <p className="text-xs text-gray-400">Bugs/projet</p>
+            <p className="text-xs text-gray-400">Bugs/project</p>
           </div>
           <div>
             <p className="text-xl font-bold text-green-400">
@@ -175,21 +178,19 @@ const totalBugsFound = chats.reduce((sum, chat) => {
                 ? Math.round((stats.totalComponents / stats.totalAnalyses) * 10) / 10
                 : 0}
             </p>
-            <p className="text-xs text-gray-400">Composants</p>
+            <p className="text-xs text-gray-400">Components</p>
           </div>
         </div>
       </div>
 
-      {/* Projets récents */}
+      {/* Recent projects */}
       <div className="bg-gray-800 rounded-lg overflow-hidden">
         <div className="px-4 py-3 bg-gray-700 border-b border-gray-600">
-          <h3 className="text-sm font-medium text-white">Projets récents</h3>
+          <h3 className="text-sm font-medium text-white">Recent Projects</h3>
         </div>
         <div className="divide-y divide-gray-700">
           {stats.recentProjects.length === 0 ? (
-            <div className="px-4 py-6 text-center text-gray-500 text-sm">
-              Aucun projet pour le moment
-            </div>
+            <div className="px-4 py-6 text-center text-gray-500 text-sm">No projects yet</div>
           ) : (
             stats.recentProjects.map((project) => <ProjectRow key={project.id} project={project} />)
           )}
@@ -255,10 +256,10 @@ function ProjectRow({ project }) {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `${days}j`;
+    if (days > 0) return `${days}d`;
     if (hours > 0) return `${hours}h`;
-    if (minutes > 0) return `${minutes}min`;
-    return "Maintenant";
+    if (minutes > 0) return `${minutes}m`;
+    return "Now";
   };
 
   return (

@@ -37,7 +37,7 @@ export function ConversationList({
           className="w-full flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-500 hover:to-blue-500 transition-all text-sm font-medium"
         >
           <Plus className="w-4 h-4" />
-          Nouveau projet
+          New Project
         </button>
       </div>
 
@@ -47,8 +47,8 @@ export function ConversationList({
           {conversations.length === 0 ? (
             <div className="text-center py-8 text-gray-500 text-sm">
               <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p>Aucun projet</p>
-              <p className="text-xs mt-1">Créez votre première analyse</p>
+              <p>No projects yet</p>
+              <p className="text-xs mt-1">Create your first analysis</p>
             </div>
           ) : (
             conversations.map((conv) => (
@@ -64,10 +64,10 @@ export function ConversationList({
                 <div className="flex items-start gap-3">
                   <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{conv.title || "Sans titre"}</p>
+                    <p className="text-sm font-medium truncate">{conv.title || "Untitled"}</p>
                     {conv.updatedAt && (
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {new Date(conv.updatedAt?.seconds * 1000).toLocaleDateString("fr-FR")}
+                        {new Date(conv.updatedAt?.seconds * 1000).toLocaleDateString("en-US")}
                       </p>
                     )}
                   </div>
@@ -80,7 +80,7 @@ export function ConversationList({
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-800">
-        <p className="text-xs text-gray-500 text-center">Propulsé par Gemini 3</p>
+        <p className="text-xs text-gray-500 text-center">Powered by Gemini 3</p>
       </div>
     </aside>
   );

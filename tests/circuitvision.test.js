@@ -1,11 +1,11 @@
 /**
  * Tests CircuitVision AI
- * Validation automatique de toutes les fonctionnalités critiques
+ * Automated validation of all critical features
  */
 
-// Test 1 : Hardware Validator
+// Test 1: Hardware Validator
 export function testHardwareValidator() {
-  const { analyzeHardwareCode } = require('./lib/hardware-validator');
+  const { analyzeHardwareCode } = require('../src/lib/hardware-validator');
   
   console.log('🧪 Test 1: Hardware Validator');
   
@@ -115,7 +115,7 @@ export function testMermaidValidator() {
   
   console.log('🧪 Test 3: Mermaid Validator');
   
-  // Code Mermaid cassé intentionnellement
+  // Broken Mermaid code intentionally
   const brokenMermaid = `
     flowchart TD
         Node(" Invalid syntax )
@@ -349,7 +349,7 @@ export async function runAllTests() {
     }
   }
   
-  // Résumé
+  // Summary
   const totalTests = results.length;
   const passedTests = results.filter(r => r.passed).length;
   const failedTests = totalTests - passedTests;
@@ -372,7 +372,7 @@ export async function runAllTests() {
   };
 }
 
-// Export pour utilisation en CLI
+// CLI Export
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     runAllTests,

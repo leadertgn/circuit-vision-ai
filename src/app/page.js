@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { getSessionId } from "@/lib/session";
 import { useGithubDocButton } from "@/hooks/useGithubDocButton";
+import { useLanguage } from "@/hooks/useLanguage";
 import { extractComponentsFromCode } from "@/lib/component-search";
 
 // Components
@@ -66,7 +67,7 @@ const uploadToCloudinary = async (base64File, fileType) => {
 // Helper: Process file
 const processFile = (file, callback) => {
   if (file.size > 20 * 1024 * 1024) {
-    alert("Fichier trop lourd (>20Mo)");
+    alert("File too large (>20MB)");
     return;
   }
   const reader = new FileReader();
@@ -128,6 +129,9 @@ export default function Home() {
     messages,
     activeChatId
   );
+  
+  // Language detection hook
+  const { language: userLanguage, isLoading: langLoading } = useLanguage();
 
   // Firebase subscriptions
   useEffect(() => {
@@ -222,7 +226,7 @@ export default function Home() {
       if (!chatId) {
         const docRef = await addDoc(collection(db, "conversations"), {
           sessionId,
-          title: "Nouvelle conversation", // Titre temporaire, sera remplacé par l'API
+          title: "New conversation", // Titre temporaire, sera remplacé par l'API
           updatedAt: serverTimestamp(),
         });
         chatId = docRef.id;
@@ -255,23 +259,41 @@ export default function Home() {
           sessionId: chatId,
           history,
           enableStreaming,
+          userLanguage,
         }),
       });
 
       console.log("API response:", response.status);
 
       if (enableStreaming && response.headers.get("content-type")?.includes("text/event-stream")) {
-        handleStreamingResponse(response, chatId);
+        // Detect GitHub URL from input
+        const githubUrlMatch = input.match(/https:\/\/github\.com\/[^\s]+/);
+        const detectedGithubUrl = githubUrlMatch ? githubUrlMatch[0] : null;
+        handleStreamingResponse(response, chatId, detectedGithubUrl);
       } else {
         const data = await response.json();
         await addDoc(collection(db, "conversations", chatId, "messages"), {
           role: "assistant",
-          text: data.analysis || "Erreur",
+          text: data.analysis || "Error",
           githubUrl: data.githubUrl,
           createdAt: serverTimestamp(),
         });
 
-        // Générer un titre pour la conversation
+        // Enable simulator if components detected (non-streaming mode)
+        if (data.metadata?.componentsFound > 0 && data.arduinoCode) {
+          setSimulatorData({
+            code: data.arduinoCode,
+            components: Array(data.metadata.componentsFound)
+              .fill(null)
+              .map((_, i) => ({
+                component: "Component",
+                pin: "GPIO" + (i + 1),
+              })),
+          });
+          setShowSimulator(true);
+        }
+
+        // Generate title for conversation
         try {
           await fetch("/api/generate-title", {
             method: "POST",
@@ -292,125 +314,129 @@ export default function Home() {
       setRealAttachments([]);
     } catch (error) {
       console.error("Error:", error);
-      alert("Erreur lors de l'analyse.");
+      alert("Analysis error occurred.");
     } finally {
       setLoading(false);
     }
   };
 
-// REMPLACER la fonction handleStreamingResponse (ligne 149-201) par :
+  const handleStreamingResponse = async (response, chatId, githubUrl) => {
+    console.log("🔄 Streaming started");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let accumulatedText = "";
+    let bugsData = null;
+    let shoppingData = null;
 
-const handleStreamingResponse = async (response, chatId) => {
-  console.log("🔄 Streaming started");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let accumulatedText = "";
-  let bugsData = null;
-  let shoppingData = null;
+    // Create temporary message
+    const tempMsgRef = await addDoc(collection(db, "conversations", chatId, "messages"), {
+      role: "assistant",
+      text: "",
+      isStreaming: true,
+      createdAt: serverTimestamp(),
+    });
 
-  // Créer message temporaire
-  const tempMsgRef = await addDoc(collection(db, "conversations", chatId, "messages"), {
-    role: "assistant",
-    text: "",
-    isStreaming: true,
-    createdAt: serverTimestamp(),
-  });
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        console.log("✅ Streaming complete");
-        break;
-      }
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        // Gérer les events SSE
-        if (line.startsWith("event: ")) {
-          const eventType = line.slice(7).trim();
-          console.log("📡 Event:", eventType);
-          continue;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          console.log("✅ Streaming complete");
+          break;
         }
 
-        // Gérer les data SSE
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6));
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
 
-            // Streaming du texte
-            if (data.text) {
-              accumulatedText += data.text;
-              await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
-                text: accumulatedText,
-              });
-            }
+        for (const line of lines) {
+          // Gérer les events SSE
+          if (line.startsWith("event: ")) {
+            const eventType = line.slice(7).trim();
+            console.log("📡 Event:", eventType);
+            continue;
+          }
 
-            // Bugs détectés
-            if (data.bugs && data.bugs.length > 0) {
-              bugsData = data;
-              console.log("🐛 Bugs détectés:", data.bugs.length);
-              // Afficher notification ou badge
-            }
+          // Gérer les data SSE
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
 
-            // Shopping list
-            if (data.items && data.items.length > 0) {
-              shoppingData = data;
-              console.log("🛒 Composants:", data.items.length);
-            }
-          } catch (e) {
-            // Ignorer les lignes invalides
-            if (line.trim() !== "") {
-              console.warn("⚠️ Parse error:", e.message);
+              // Streaming du texte
+              if (data.text) {
+                accumulatedText += data.text;
+                await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+                  text: accumulatedText,
+                });
+              }
+
+              // Bugs détectés
+              if (data.bugs && data.bugs.length > 0) {
+                bugsData = data;
+                console.log("🐛 Bugs détectés:", data.bugs.length);
+                // Afficher notification ou badge
+              }
+
+              // Shopping list
+              if (data.items && data.items.length > 0) {
+                shoppingData = data;
+                console.log("🛒 Components:", data.items.length);
+              }
+            } catch (e) {
+              // Ignorer les lignes invalides
+              if (line.trim() !== "") {
+                console.warn("⚠️ Parse error:", e.message);
+              }
             }
           }
         }
       }
-    }
 
-    // Finaliser le message
-    await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
-      isStreaming: false,
-      bugsFound: bugsData?.bugs?.length || 0,
-      componentsFound: shoppingData?.items?.length || 0,
-    });
-
-    // Générer titre conversation
-    if (accumulatedText.length > 50) {
-      fetch("/api/generate-title", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chatId,
-          aiFirstResponse: accumulatedText.substring(0, 300),
-        }),
-      }).catch(console.error);
-    }
-
-    // Activer simulateur si composants détectés
-    if (shoppingData && shoppingData.items.length > 0) {
-      setSimulatorData({
-        code: accumulatedText,
-        components: shoppingData.items.map((item) => ({
-          component: item.component,
-          pin: "GPIO" + Math.floor(Math.random() * 30),
-        })),
+      // Finalize message with githubUrl
+      await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+        isStreaming: false,
+        bugsFound: bugsData?.bugs?.length || 0,
+        componentsFound: shoppingData?.items?.length || 0,
+        githubUrl: githubUrl,
       });
-      setShowSimulator(true);
+
+      // Generate conversation title
+      if (accumulatedText.length > 50) {
+        fetch("/api/generate-title", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chatId,
+            aiFirstResponse: accumulatedText.substring(0, 300),
+          }),
+        }).catch(console.error);
+      }
+
+      // Enable simulator if components detected
+      if (shoppingData && shoppingData.items.length > 0) {
+        // Use arduinoCode instead of accumulatedText (markdown)
+        const arduinoCode =
+          accumulatedText.match(/```(?:arduino|cpp)?\n([\s\S]*?)```/)?.[1]?.trim() ||
+          "// Arduino code will appear here\n\nvoid setup() {\n  // Your code here\n}\n\nvoid loop() {\n  // Your code here\n}";
+
+        setSimulatorData({
+          code: arduinoCode, // Code Arduino pur, pas le markdown!
+          components: shoppingData.items.map((item) => ({
+            component: item.component,
+            pin: "GPIO" + Math.floor(Math.random() * 30),
+          })),
+        });
+        setShowSimulator(true);
+      }
+    } catch (error) {
+      console.error("❌ Streaming error:", error);
+      await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
+        text: accumulatedText || "Streaming error",
+        isStreaming: false,
+      });
     }
-  } catch (error) {
-    console.error("❌ Streaming error:", error);
-    await updateDoc(doc(db, "conversations", chatId, "messages", tempMsgRef.id), {
-      text: accumulatedText || "Erreur lors du streaming",
-      isStreaming: false,
-    });
-  }
-};
+  };
 
   const resetConversation = () => {
-    if (confirm("Démarrer un nouveau projet ?")) {
+    if (confirm("Start a new project?")) {
       setMessages([]);
       setInput("");
       setRefAttachments([]);
@@ -488,12 +514,9 @@ const handleStreamingResponse = async (response, chatId) => {
                 <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/20">
                   <Cpu className="w-10 h-10 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-3">
-                  Bienvenue sur CircuitVision AI
-                </h2>
+                <h2 className="text-2xl font-bold text-white mb-3">Welcome to CircuitVision AI</h2>
                 <p className="text-gray-400 mb-6">
-                  Analysez vos circuits embarqués en quelques secondes. Collez un lien GitHub ou
-                  décrivez votre projet.
+                  Analyze embedded circuits in seconds.Paste a GitHub URL or describe your project
                 </p>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="p-4 bg-gray-800 rounded-xl border border-gray-700">
@@ -513,7 +536,7 @@ const handleStreamingResponse = async (response, chatId) => {
                       </svg>
                     </div>
                     <p className="font-medium text-white">Bug Detection</p>
-                    <p className="text-xs text-gray-500 mt-1">Détection automatique</p>
+                    <p className="text-xs text-gray-500 mt-1">Automatic detection</p>
                   </div>
                   <div className="p-4 bg-gray-800 rounded-xl border border-gray-700">
                     <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -532,7 +555,7 @@ const handleStreamingResponse = async (response, chatId) => {
                       </svg>
                     </div>
                     <p className="font-medium text-white">Shopping List</p>
-                    <p className="text-xs text-gray-500 mt-1">Composants détectés</p>
+                    <p className="text-xs text-gray-500 mt-1">Components detected</p>
                   </div>
                 </div>
               </div>
@@ -597,7 +620,7 @@ const handleStreamingResponse = async (response, chatId) => {
                 }`}
               >
                 <Copy className="w-4 h-4" />
-                Mode comparaison
+                Compare mode
               </button>
             </div>
 

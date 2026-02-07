@@ -148,16 +148,16 @@ function BugsAlert({ bugs }) {
         <AlertCircle className={`w-5 h-5 text-${color}-600 mt-0.5`} />
         <div className="flex-1">
           <h4 className={`font-semibold text-${color}-900 mb-2`}>
-            🔍 {stats.total} problème(s) hardware détecté(s)
+            🔍 {stats.total} hardware issue(s) detected
           </h4>
           <div className="space-y-1 text-sm">
             {stats.critical > 0 && (
-              <div className="text-red-700">❌ {stats.critical} critique(s)</div>
+              <div className="text-red-700">❌ {stats.critical} critical</div>
             )}
             {stats.warnings > 0 && (
-              <div className="text-yellow-700">⚠️ {stats.warnings} avertissement(s)</div>
+              <div className="text-yellow-700">⚠️ {stats.warnings}warning(s)</div>
             )}
-            {stats.info > 0 && <div className="text-blue-700">ℹ️ {stats.info} info(s)</div>}
+            {stats.info > 0 && <div className="text-blue-700">ℹ️ {stats.info} info</div>}
           </div>
         </div>
       </div>
@@ -173,9 +173,9 @@ function ShoppingListPreview({ items }) {
         <ShoppingCart className="w-5 h-5 text-green-600 mt-0.5" />
         <div className="flex-1">
           <h4 className="font-semibold text-green-900 mb-2">
-            🛒 {items.length} composant(s) détecté(s)
+            🛒 {items.length} component(s) detected
           </h4>
-          <div className="text-sm text-green-700">Liste de courses générée automatiquement</div>
+          <div className="text-sm text-green-700">hopping list auto-generated</div>
         </div>
       </div>
     </div>
