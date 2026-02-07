@@ -99,7 +99,30 @@ const processFile = (file, callback) => {
   };
   reader.readAsDataURL(file);
 };
-
+// ✅ Helper function pour extraire composants (ajouter ligne ~110)
+function extractComponentsForSimulator(markdown) {
+  const tableRegex = /\|\s*([^|]+)\s*\|\s*(GPIO\d+|D\d+|A\d+|Pin\s*\d+)\s*\|/gi;
+  const components = [];
+  let match;
+  
+  while ((match = tableRegex.exec(markdown)) !== null) {
+    const componentName = match[1].trim();
+    const pinName = match[2].trim();
+    
+    // Skip header row
+    if (componentName.toLowerCase().includes('component') || 
+        componentName.toLowerCase().includes('composant')) {
+      continue;
+    }
+    
+    components.push({
+      component: componentName,
+      pin: pinName,
+    });
+  }
+  
+  return components.slice(0, 10); // Max 10 for Wokwi
+}
 export default function Home() {
   // States
   const [messages, setMessages] = useState([]);
@@ -159,7 +182,26 @@ export default function Home() {
       setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
   }, [activeChatId]);
+// ✅ ÉGALEMENT AJOUTER : Load simulator data from Firestore on mount
+// Ajouter ce useEffect après ligne 120 :
 
+useEffect(() => {
+  if (!activeChatId) return;
+  
+  // Check if simulator data exists in last message
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage?.role === 'assistant' && lastMessage?.arduinoCode) {
+    const components = extractComponentsForSimulator(lastMessage.text);
+    if (components.length > 0) {
+      setSimulatorData({
+        code: lastMessage.arduinoCode,
+        components: components,
+        connections: []
+      });
+      setShowSimulator(true);
+    }
+  }
+}, [messages, activeChatId]);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -592,19 +634,17 @@ export default function Home() {
           )}
         </div>
 
-        {/* Simulator */}
-        {showSimulator && simulatorData && (
-          <div className="border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm p-4">
-            <div className="max-w-4xl mx-auto">
-              <WokwiSimulator
-                code={simulatorData.code}
-                components={simulatorData.components}
-                onSimulationStart={() => {}}
-                onSimulationStop={() => {}}
-              />
-            </div>
-          </div>
-        )}
+{/* Simulator - CORRECTED VERSION with persistence */}
+{showSimulator && simulatorData && (
+  <WokwiSimulator
+    code={simulatorData.code}
+    components={simulatorData.components}
+    connections={simulatorData.connections || []}
+    chatId={activeChatId} // ✅ NEW: Pass chatId for persistence
+    onSimulationStart={() => console.log("Simulation started")}
+    onSimulationStop={() => console.log("Simulation stopped")}
+  />
+)}
 
         {/* Input Area */}
         <div className="border-t border-gray-800 bg-gray-900">

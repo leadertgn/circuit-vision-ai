@@ -1,6 +1,8 @@
 ﻿/**
- * Component Search - Recherche automatique de composants avec prix et liens d'achat
- * Utilise Google Search de Gemini 3 pour trouver les meilleurs prix
+ * Component Search - CORRECTED VERSION
+ * ✅ Google Search with real prices
+ * ✅ Purchase links in markdown table
+ * ✅ Proper price display
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -10,12 +12,12 @@ const genAI =
   typeof window === "undefined" ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 /**
- * Extrait les composants du code source
+ * Extract components from source code
  */
 export function extractComponentsFromCode(code) {
   const components = new Set();
 
-  // Patterns de composants connus
+  // Component patterns
   const componentPatterns = [
     // Sensors
     { regex: /DHT22|DHT11/gi, component: "DHT22" },
@@ -52,7 +54,7 @@ export function extractComponentsFromCode(code) {
     { regex: /Relay/gi, component: "Relay Module" },
     { regex: /LED Strip|WS2812|NeoPixel/gi, component: "WS2812 LED Strip" },
     { regex: /RC522|MFRC522/gi, component: "RFID RC522" },
-    { regex: / ultrasonic/i, component: "HC-SR04 Ultrasonic" },
+    { regex: /ultrasonic/i, component: "HC-SR04 Ultrasonic" },
   ];
 
   componentPatterns.forEach((pattern) => {
@@ -65,7 +67,7 @@ export function extractComponentsFromCode(code) {
 }
 
 /**
- * Compte les occurrences pour estimer la quantité
+ * Estimate quantity based on occurrences
  */
 export function estimateQuantity(code, component) {
   const escapedComponent = component.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -75,27 +77,26 @@ export function estimateQuantity(code, component) {
 }
 
 /**
- * FONCTION PRINCIPALE - Recherche les prix avec Google Search via Gemini 3
- * Cette fonction utilise l'outil Google Search de Gemini 3
+ * ✅ MAIN FUNCTION - Search prices with Google Search via Gemini 3
  */
 export async function searchComponentPrices(components, language = "en") {
   if (!components || components.length === 0) {
     return { success: false, items: [], error: "No components provided" };
   }
 
-  // Vérifier que Gemini est disponible (côté serveur uniquement)
+  // Check Gemini availability (server-side only)
   if (!genAI) {
     console.warn("⚠️ Gemini not available (client-side), using fallback prices");
     return getFallbackPrices(components);
   }
 
   try {
-    console.log(`🔍 Searching prices for ${components.length} components...`);
+    console.log(`🔍 Searching prices for ${components.length} components with Google Search...`);
 
-    // Modèle Gemini avec Google Search activé
+    // Gemini model with Google Search enabled
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      tools: [{ googleSearch: {} }], // 🆕 Outil Google Search activé
+      tools: [{ googleSearch: {} }], // 🆕 Google Search tool enabled
     });
 
     const prompt =
@@ -104,10 +105,12 @@ export async function searchComponentPrices(components, language = "en") {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    console.log("✅ Google Search completed");
+    console.log("✅ Google Search completed, parsing results...");
 
-    // Parser la réponse JSON
+    // Parse JSON response
     const shoppingItems = parseShoppingResponse(responseText, components);
+
+    console.log(`✅ Found prices for ${shoppingItems.length} components`);
 
     return {
       success: true,
@@ -121,133 +124,236 @@ export async function searchComponentPrices(components, language = "en") {
 }
 
 /**
- * Prompt de recherche en anglais
+ * English search prompt
  */
 function getEnglishSearchPrompt(components) {
   return `
 🛒 SHOPPING LIST - Electronic Components with Real Prices
 
-For each of these components, search Google and find current prices:
+Search Google for CURRENT PRICES and PURCHASE LINKS for these components:
 
 ${components.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
 For EACH component, provide in JSON format:
 {
-  "component": "Name",
-  "price_usd": "X.XX (average price)",
+  "component": "Component name",
+  "price_usd": "X.XX",
   "vendors": [
-    {"name": "Amazon", "price": "X.XX", "url": "https://amazon.com/..."},
-    {"name": "Mouser", "price": "X.XX", "url": "https://mouser.com/..."},
-    {"name": "AliExpress", "price": "X.XX", "url": "https://aliexpress.com/..."}
+    {
+      "name": "Amazon",
+      "price": "X.XX",
+      "url": "https://amazon.com/dp/XXXXX"
+    },
+    {
+      "name": "Mouser",
+      "price": "X.XX", 
+      "url": "https://mouser.com/ProductDetail/XXXXX"
+    }
   ],
-  "alternatives": ["Alt1", "Alt2"]
+  "alternatives": ["Alternative 1", "Alternative 2"]
 }
 
-Respond ONLY with valid JSON, no additional text. Example:
+IMPORTANT:
+- Include REAL working URLs from Google Search results
+- Use actual current prices from 2026
+- Provide at least 2 vendors per component
+- Respond ONLY with valid JSON array, no markdown or explanations
+
+Example output:
 [
-  {"component": "ESP32", "price_usd": "6.99", "vendors": [{"name": "Amazon", "price": "6.99", "url": "https://amazon.com/dp/B08..."}], "alternatives": ["ESP32-S2"]}
+  {
+    "component": "ESP32",
+    "price_usd": "6.99",
+    "vendors": [
+      {"name": "Amazon", "price": "6.99", "url": "https://amazon.com/dp/B08DQQ8CBP"},
+      {"name": "AliExpress", "price": "4.50", "url": "https://aliexpress.com/item/123456.html"}
+    ],
+    "alternatives": ["ESP32-S2", "ESP32-C3"]
+  }
 ]
 `;
 }
 
 /**
- * Prompt de recherche en français
+ * French search prompt
  */
 function getFrenchSearchPrompt(components) {
   return `
 🛒 LISTE DE COURSES - Composants Électroniques avec Prix Réels
 
-Pour chacun de ces composants, fais une recherche Google et trouve les prix actuels :
+Recherche sur Google les PRIX ACTUELS et LIENS D'ACHAT pour ces composants :
 
 ${components.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 
 Pour CHAQUE composant, fournis en format JSON :
 {
-  "component": "Nom",
-  "price_usd": "X.XX (prix moyen)",
+  "component": "Nom du composant",
+  "price_usd": "X.XX",
   "vendors": [
-    {"name": "Amazon", "price": "X.XX", "url": "https://amazon.fr/..."},
-    {"name": "Mouser", "price": "X.XX", "url": "https://mouser.com/..."},
-    {"name": "AliExpress", "price": "X.XX", "url": "https://aliexpress.com/..."}
+    {
+      "name": "Amazon",
+      "price": "X.XX",
+      "url": "https://amazon.fr/dp/XXXXX"
+    },
+    {
+      "name": "Mouser",
+      "price": "X.XX",
+      "url": "https://mouser.fr/ProductDetail/XXXXX"
+    }
   ],
-  "alternatives": ["Alt1", "Alt2"]
+  "alternatives": ["Alternative 1", "Alternative 2"]
 }
 
-Réponds UNIQUEMENT avec du JSON valide, sans texte supplémentaire.
+IMPORTANT :
+- Inclure des URLs RÉELLES issues de Google Search
+- Utiliser les prix actuels de 2026
+- Fournir au moins 2 vendeurs par composant
+- Répondre UNIQUEMENT avec un tableau JSON valide
+
+Exemple :
+[
+  {
+    "component": "ESP32",
+    "price_usd": "6.99",
+    "vendors": [
+      {"name": "Amazon", "price": "6.99", "url": "https://amazon.fr/dp/B08DQQ8CBP"}
+    ],
+    "alternatives": ["ESP32-S2"]
+  }
+]
 `;
 }
 
 /**
- * Parse la réponse de Gemini pour extraire les informations d'achat
+ * Parse Gemini response to extract shopping info
  */
 function parseShoppingResponse(responseText, originalComponents) {
   try {
-    // Extraire le JSON de la réponse
+    // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
+      console.warn("No JSON found in response, using fallback");
       throw new Error("No JSON found in response");
     }
 
     const items = JSON.parse(jsonMatch[0]);
 
-    // Normaliser les données
+    // Normalize data
     return items.map((item) => ({
       component: item.component || "Unknown",
       price_usd: item.price_usd || "Check manually",
-      vendors: (item.vendors || []).slice(0, 3),
+      vendors: (item.vendors || []).slice(0, 3).map(v => ({
+        name: v.name || "Vendor",
+        price: v.price || item.price_usd || "N/A",
+        url: v.url || `https://www.google.com/search?q=${encodeURIComponent(item.component)}`
+      })),
       alternatives: item.alternatives || getDefaultAlternatives(item.component),
     }));
   } catch (error) {
-    console.warn("⚠️ Failed to parse shopping response, using fallback");
-    return getFallbackPrices(originalComponents);
+    console.warn("⚠️ Failed to parse shopping response:", error.message);
+    return getFallbackPrices(originalComponents).items;
   }
 }
 
 /**
- * Prix de fallback si Google Search échoue
+ * Fallback prices if Google Search fails
  */
 function getFallbackPrices(components) {
   const fallbackPrices = {
-    ESP32: { price: "6.99", vendors: ["Amazon", "AliExpress"] },
-    DHT22: { price: "4.99", vendors: ["Amazon", "AliExpress"] },
-    "OLED SSD1306": { price: "5.99", vendors: ["Amazon", "AliExpress"] },
-    "HC-SR04": { price: "3.99", vendors: ["Amazon", "AliExpress"] },
-    "Servo Motor": { price: "4.99", vendors: ["Amazon", "AliExpress"] },
-    BMP280: { price: "4.49", vendors: ["Amazon", "AliExpress"] },
-    MPU6050: { price: "5.99", vendors: ["Amazon", "AliExpress"] },
-    L298N: { price: "7.99", vendors: ["Amazon", "AliExpress"] },
-    nRF24L01: { price: "3.49", vendors: ["Amazon", "AliExpress"] },
-    "RFID RC522": { price: "6.99", vendors: ["Amazon", "AliExpress"] },
+    ESP32: { 
+      price: "6.99", 
+      vendors: [
+        { name: "Amazon", price: "6.99", url: "https://amazon.com/s?k=ESP32" },
+        { name: "AliExpress", price: "4.50", url: "https://aliexpress.com/wholesale?SearchText=ESP32" }
+      ]
+    },
+    DHT22: { 
+      price: "4.99", 
+      vendors: [
+        { name: "Amazon", price: "4.99", url: "https://amazon.com/s?k=DHT22" },
+        { name: "AliExpress", price: "2.50", url: "https://aliexpress.com/wholesale?SearchText=DHT22" }
+      ]
+    },
+    "OLED SSD1306": { 
+      price: "5.99", 
+      vendors: [
+        { name: "Amazon", price: "5.99", url: "https://amazon.com/s?k=OLED+SSD1306" },
+        { name: "AliExpress", price: "3.50", url: "https://aliexpress.com/wholesale?SearchText=OLED" }
+      ]
+    },
+    "HC-SR04": { 
+      price: "3.99", 
+      vendors: [
+        { name: "Amazon", price: "3.99", url: "https://amazon.com/s?k=HC-SR04" },
+        { name: "AliExpress", price: "1.50", url: "https://aliexpress.com/wholesale?SearchText=HC-SR04" }
+      ]
+    },
+    "Servo Motor": { 
+      price: "4.99", 
+      vendors: [
+        { name: "Amazon", price: "4.99", url: "https://amazon.com/s?k=SG90+Servo" },
+        { name: "AliExpress", price: "2.00", url: "https://aliexpress.com/wholesale?SearchText=SG90" }
+      ]
+    },
+    BMP280: { 
+      price: "4.49", 
+      vendors: [
+        { name: "Amazon", price: "4.49", url: "https://amazon.com/s?k=BMP280" },
+        { name: "Mouser", price: "5.20", url: "https://mouser.com/c/?q=BMP280" }
+      ]
+    },
+    MPU6050: { 
+      price: "5.99", 
+      vendors: [
+        { name: "Amazon", price: "5.99", url: "https://amazon.com/s?k=MPU6050" },
+        { name: "AliExpress", price: "3.00", url: "https://aliexpress.com/wholesale?SearchText=MPU6050" }
+      ]
+    },
+    L298N: { 
+      price: "7.99", 
+      vendors: [
+        { name: "Amazon", price: "7.99", url: "https://amazon.com/s?k=L298N" },
+        { name: "AliExpress", price: "4.50", url: "https://aliexpress.com/wholesale?SearchText=L298N" }
+      ]
+    },
   };
 
-  return components.map((comp) => {
-    const fallback = fallbackPrices[comp] || { price: "Check manually", vendors: [] };
+  const items = components.map((comp) => {
+    const fallback = fallbackPrices[comp] || { 
+      price: "Check manually", 
+      vendors: [
+        { name: "Google", price: "N/A", url: `https://www.google.com/search?q=${encodeURIComponent(comp + " price")}` }
+      ]
+    };
+    
     return {
       component: comp,
       price_usd: fallback.price,
-      vendors: fallback.vendors.map((name) => ({
-        name,
-        price: fallback.price,
-        url: `https://www.google.com/search?q=${encodeURIComponent(comp + " " + name)}`,
-      })),
+      vendors: fallback.vendors,
       alternatives: getDefaultAlternatives(comp),
     };
   });
+
+  return {
+    success: false,
+    items: items,
+    error: "Using fallback prices"
+  };
 }
 
 /**
- * Alternatives par défaut pour chaque composant
+ * Default alternatives for each component
  */
 function getDefaultAlternatives(component) {
   const alternatives = {
-    DHT22: ["DHT11 (less accurate)", "AM2302", "SHT31"],
+    DHT22: ["DHT11", "AM2302", "SHT31"],
     ESP32: ["ESP32-WROOM", "ESP32-S2", "ESP32-C3"],
-    BMP280: ["BMP180", "BME280 (with humidity)"],
-    MPU6050: ["MPU9250 (with magnetometer)", "MPU6500"],
+    BMP280: ["BMP180", "BME280"],
+    MPU6050: ["MPU9250", "MPU6500"],
     "OLED SSD1306": ["SSD1309", "SH1106"],
-    "Servo Motor": ["SG90", "MG90S (metal)", "MG996R (powerful)"],
+    "Servo Motor": ["SG90", "MG90S", "MG996R"],
     L298N: ["DRV8833", "TB6612", "L293D"],
-    "HC-SR04": ["US-015 (better accuracy)", "JSN-SR04T (waterproof)"],
+    "HC-SR04": ["US-015", "JSN-SR04T"],
     "RFID RC522": ["PN532", "RC522 V2.0"],
     ESP8266: ["ESP-01", "NodeMCU", "Wemos D1 Mini"],
   };
@@ -255,7 +361,7 @@ function getDefaultAlternatives(component) {
 }
 
 /**
- * Génère un tableau markdown de la shopping list
+ * ✅ CORRECTED: Generate markdown shopping list WITH LINKS AND PRICES
  */
 export function generateShoppingMarkdown(items, language = "en") {
   if (!items || items.length === 0) {
@@ -265,12 +371,15 @@ export function generateShoppingMarkdown(items, language = "en") {
   const title = language === "fr" ? "## 🛒 Liste de Courses" : "## 🛒 Shopping List";
   const componentHeader = language === "fr" ? "Composant" : "Component";
   const priceHeader = language === "fr" ? "Prix (USD)" : "Price (USD)";
-  const linksHeader = language === "fr" ? "Liens" : "Links";
+  const linksHeader = language === "fr" ? "Liens d'Achat" : "Purchase Links";
   const altsHeader = language === "fr" ? "Alternatives" : "Alternatives";
+  const note = language === "fr" 
+    ? "> 💡 Prix indicatifs trouvés via Google Search - vérifiez la disponibilité et les frais de port"
+    : "> 💡 Prices found via Google Search - check availability and shipping costs";
 
   let markdown = `${title}\n\n`;
   markdown += `| ${componentHeader} | ${priceHeader} | ${linksHeader} | ${altsHeader} |\n`;
-  markdown += `|-----------|-------------|-------------|-------------|\n`;
+  markdown += `|-----------|-------------|----------------|---------------|\n`;
 
   let totalPrice = 0;
 
@@ -280,32 +389,36 @@ export function generateShoppingMarkdown(items, language = "en") {
       totalPrice += price;
     }
 
-    const links =
-      item.vendors
-        ?.slice(0, 2)
-        .map((v) => `[${v.name}](${v.url})`)
-        .join(" • ") || "🔍 Search";
+    // ✅ CORRECTED: Format purchase links properly with prices
+    const links = item.vendors && item.vendors.length > 0
+      ? item.vendors
+          .slice(0, 2)
+          .map((v) => `[${v.name} ($${v.price})](${v.url})`)
+          .join(" • ")
+      : "🔍 [Search](https://www.google.com/search?q=" + encodeURIComponent(item.component + " buy") + ")";
 
     const alts = item.alternatives?.slice(0, 2).join(", ") || "-";
 
-    markdown += `| ${item.component} | $${item.price_usd} | ${links} | ${alts} |\n`;
+    // ✅ CORRECTED: Show average price prominently
+    markdown += `| **${item.component}** | **$${item.price_usd}** | ${links} | ${alts} |\n`;
   });
 
-  markdown += `\n> 💡 ${
-    language === "fr"
-      ? "Prix indicatifs - vérifiez la disponibilité et les frais de port"
-      : "Indicative prices - check availability and shipping costs"
-  }\n`;
+  // ✅ CORRECTED: Add total with prominent styling
+  if (totalPrice > 0) {
+    markdown += `\n**💰 Total Estimate: ~$${totalPrice.toFixed(2)}**\n\n`;
+  }
+
+  markdown += `${note}\n`;
 
   return markdown;
 }
 
 /**
- * FONCTION PRINCIPALE - Génère la shopping list complète
+ * ✅ MAIN FUNCTION - Generate complete shopping list
  */
 export async function generateShoppingList(codeSource, language = "en", useGoogleSearch = true) {
   try {
-    // 1. Extraire les composants du code
+    // 1. Extract components from code
     const components = extractComponentsFromCode(codeSource);
 
     if (components.length === 0) {
@@ -318,31 +431,34 @@ export async function generateShoppingList(codeSource, language = "en", useGoogl
 
     console.log(`🛒 Found ${components.length} components: ${components.join(", ")}`);
 
-    // 2. Rechercher les prix avec Google Search
-    let shoppingItems;
+    // 2. Search prices with Google Search
+    let shoppingResult;
     if (useGoogleSearch) {
-      const result = await searchComponentPrices(components, language);
-      shoppingItems = result.items;
+      shoppingResult = await searchComponentPrices(components, language);
     } else {
-      shoppingItems = getFallbackPrices(components);
+      shoppingResult = getFallbackPrices(components);
     }
 
-    // 3. Générer le markdown
+    const shoppingItems = shoppingResult.items;
+
+    // 3. Generate markdown with proper formatting
     const markdown = generateShoppingMarkdown(shoppingItems, language);
 
-    console.log(`✅ Shopping list generated with ${shoppingItems.length} items`);
+    const totalEstimate = shoppingItems
+      .reduce((sum, item) => {
+        const price = parseFloat(item.price_usd);
+        return sum + (isNaN(price) ? 0 : price);
+      }, 0)
+      .toFixed(2);
+
+    console.log(`✅ Shopping list generated: ${shoppingItems.length} items, $${totalEstimate} total`);
 
     return {
       success: true,
       markdown: markdown,
       items: shoppingItems,
       totalComponents: components.length,
-      totalEstimate: shoppingItems
-        .reduce((sum, item) => {
-          const price = parseFloat(item.price_usd);
-          return sum + (isNaN(price) ? 0 : price);
-        }, 0)
-        .toFixed(2),
+      totalEstimate: totalEstimate,
     };
   } catch (error) {
     console.error("❌ Shopping list generation error:", error);

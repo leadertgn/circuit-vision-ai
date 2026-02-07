@@ -6,7 +6,11 @@ import { NextResponse } from "next/server";
 import { sanitizeMermaidCode } from "@/lib/mermaid-validator";
 import { extractGithubUrl } from "@/lib/doc-completion-detector";
 import { analyzeHardwareCode } from "@/lib/hardware-validator";
-import { extractComponentsFromCode, searchComponentPrices } from "@/lib/component-search";
+import { 
+  extractComponentsFromCode, 
+  searchComponentPrices,
+  generateShoppingMarkdown 
+} from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
 import { DocumentationSchema } from "@/lib/schemas";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -466,24 +470,38 @@ export async function POST(req) {
             });
           }
 
-          // ðŸ†• GÃ‰NÃ‰RATION SHOPPING LIST
-          const components = extractComponentsFromCode(githubContext);
-          if (components.length > 0) {
-            console.log(`Shopping list: Found ${components.length} components`);
-            
-            // Search for real prices using Google Search
-            const shoppingResult = await searchComponentPrices(components, userLanguage);
-            
-            if (shoppingResult.success && shoppingResult.markdown) {
-              promptParts.push({
-                text: shoppingResult.markdown,
-              });
-            } else {
-              promptParts.push({
-                text: `\nCOMPOSANTS DETECTES : ${components.join(", ")}\n\nCree une section "Shopping List" avec ces composants.`,
-              });
-            }
-          }
+// ✅ GÉNÉRATION SHOPPING LIST avec Google Search
+if (githubContext) {
+  const components = extractComponentsFromCode(githubContext);
+  
+  if (components.length > 0) {
+    console.log(`🛒 Searching prices for ${components.length} components...`);
+    
+    // ✅ Call Google Search via Gemini 3
+    const shoppingResult = await searchComponentPrices(components, userLanguage);
+    
+    if (shoppingResult.success && shoppingResult.items) {
+      // ✅ CORRECTED: Use proper markdown generation with links
+      const shoppingMarkdown = generateShoppingMarkdown(shoppingResult.items, userLanguage);
+      
+      console.log('✅ Shopping list markdown generated with purchase links');
+      
+      // ✅ Add to prompt for inclusion in documentation
+      promptParts.push({
+        text: `\n\n${shoppingMarkdown}\n\n⚠️ IMPORTANT: Include this EXACT shopping list in your documentation. DO NOT regenerate it. Copy it as-is with all links and prices.\n`
+      });
+      
+      // ✅ Log sample for verification
+      console.log('📋 Sample shopping list:', shoppingMarkdown.substring(0, 300));
+    } else {
+      // Fallback without prices
+      console.warn('⚠️ Google Search failed, using component list without prices');
+      promptParts.push({
+        text: `\nCOMPONENTS DETECTED: ${components.join(", ")}\n\nCreate a "Shopping List" section with these components.`
+      });
+    }
+  }
+}
 
           // ðŸ†• DÃ‰TECTION PLATEFORME
           const platformInfo = detectPlatformType(githubContext, [
@@ -530,7 +548,15 @@ export async function POST(req) {
         return null;
       }
     }
-
+// ✅ HELPER FUNCTION: Calculate total (add after line ~270)
+function calculateTotal(items) {
+  if (!items || items.length === 0) return "0.00";
+  const sum = items.reduce((acc, item) => {
+    const price = parseFloat(item.price_usd);
+    return acc + (isNaN(price) ? 0 : price);
+  }, 0);
+  return sum.toFixed(2);
+}
     // MODE COMPARAISON
     if (isCompare) {
       if (referenceFiles?.length > 0) {
@@ -691,21 +717,23 @@ export async function POST(req) {
                     );
                   }
 
-                  const components = extractComponentsFromCode(githubContext);
-                  if (components.length > 0) {
-                    const shoppingData = {
-                      items: components.map((comp) => ({
-                        component: comp,
-                        quantity: 1,
-                        estimated_price: "À rechercher",
-                      })),
-                    };
-                    controller.enqueue(
-                      encoder.encode(
-                        `event: shopping_list\ndata: ${JSON.stringify(shoppingData)}\n\n`
-                      )
-                    );
-                  }
+const components = extractComponentsFromCode(githubContext);
+if (components.length > 0) {
+  console.log(`🛒 Streaming: Found ${components.length} components`);
+  
+  const shoppingResult = await searchComponentPrices(components, userLanguage);
+  
+  if (shoppingResult.success && shoppingResult.items) {
+    controller.enqueue(
+      encoder.encode(
+        `event: shopping_list\ndata: ${JSON.stringify({
+          items: shoppingResult.items,
+          total_usd: calculateTotal(shoppingResult.items)
+        })}\n\n`
+      )
+    );
+  }
+}
                 }
 
                 // 3. Stream Gemini response
