@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 import { sanitizeMermaidCode } from "@/lib/mermaid-validator";
 import { extractGithubUrl } from "@/lib/doc-completion-detector";
 import { analyzeHardwareCode } from "@/lib/hardware-validator";
-import { extractComponentsFromCode } from "@/lib/component-search";
+import { extractComponentsFromCode, searchComponentPrices } from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
 import { DocumentationSchema } from "@/lib/schemas";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -469,9 +469,20 @@ export async function POST(req) {
           // ðŸ†• GÃ‰NÃ‰RATION SHOPPING LIST
           const components = extractComponentsFromCode(githubContext);
           if (components.length > 0) {
-            promptParts.push({
-              text: `\nðŸ›’ COMPOSANTS DÃ‰TECTÃ‰S : ${components.join(", ")}\n\nCrÃ©e une section "Shopping List" avec ces composants.`,
-            });
+            console.log(`Shopping list: Found ${components.length} components`);
+            
+            // Search for real prices using Google Search
+            const shoppingResult = await searchComponentPrices(components, userLanguage);
+            
+            if (shoppingResult.success && shoppingResult.markdown) {
+              promptParts.push({
+                text: shoppingResult.markdown,
+              });
+            } else {
+              promptParts.push({
+                text: `\nCOMPOSANTS DETECTES : ${components.join(", ")}\n\nCree une section "Shopping List" avec ces composants.`,
+              });
+            }
           }
 
           // ðŸ†• DÃ‰TECTION PLATEFORME
