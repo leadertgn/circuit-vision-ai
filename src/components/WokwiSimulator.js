@@ -4,10 +4,35 @@ import { Play, Square, Zap, Code, Settings, ExternalLink, X, ChevronDown, Chevro
 
 /**
  * Wokwi Circuit Simulator Integration - CORRECTED VERSION
- * - Collapsible UI with close button
- * - Persists across page refresh
- * - Proper multi-platform detection
+ * - Dynamic URL based on platform
+ * - Warning for unsupported platforms
+ * - Unique simulation per conversation
  */
+
+// Platform to Wokwi URL mapping
+const wokwiPlatformUrls = {
+  'Arduino Uno': 'https://wokwi.com/arduino/new',
+  'Arduino Nano': 'https://wokwi.com/arduino-nano/new',
+  'Arduino Mega': 'https://wokwi.com/arduino-mega/new',
+  'ESP32': 'https://wokwi.com/esp32/new',
+  'STM32': 'https://wokwi.com/stm32/new',
+  'Raspberry Pi Pico': 'https://wokwi.com/pico/new',
+};
+
+// Unsupported platforms
+const unsupportedPlatforms = ['ESP8266'];
+
+// Helper function to get Wokwi URL based on platform
+function getWokwiUrl(platform, code) {
+  const baseUrl = wokwiPlatformUrls[platform] || wokwiPlatformUrls['Arduino Uno'];
+  const encodedCode = encodeURIComponent(code);
+  return `${baseUrl}?code=${encodedCode}`;
+}
+
+// Helper function to check if platform is supported
+function isPlatformSupported(platform) {
+  return wokwiPlatformUrls.hasOwnProperty(platform) && !unsupportedPlatforms.includes(platform);
+}
 
 // Helper function to map components to Wokwi parts
 function mapComponentsToWokwiParts(components) {
@@ -177,8 +202,7 @@ export default function WokwiSimulator({
     setWokwiConfig(config);
 
     // Generate proper Wokwi URL for simulation
-    const encodedCode = encodeURIComponent(code);
-    const projectUrl = `https://wokwi.com/arduino/new?code=${encodedCode}`;
+    const projectUrl = getWokwiUrl(detectedPlatform, code);
     setWokwiUrl(projectUrl);
   }, [code, components, connections]);
 
