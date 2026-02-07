@@ -419,7 +419,7 @@ export async function POST(req) {
 
     let aiResponse = "";
     const modelsToTry = [
-      //  "gemini-3-flash-preview", instable
+      //"gemini-3-flash-preview", instable
       "gemini-2.5-flash-lite", // Stable + Ã©conomique
       "gemini-2.5-flash", // Stable + rapide
       "gemini-2.5-pro", // Stable + puissant
@@ -441,6 +441,7 @@ export async function POST(req) {
 
         // ðŸ†• AJOUTER STRUCTURED OUTPUT SI APPLICABLE
         if (useStructuredOutput && hasGithub) {
+          console.log("📋 Using structured output for GitHub analysis");
           modelConfig.generationConfig = {
             responseMimeType: "application/json",
             responseSchema: zodToJsonSchema(DocumentationSchema),
