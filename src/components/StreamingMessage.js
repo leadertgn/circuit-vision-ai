@@ -24,9 +24,7 @@ export default function StreamingMessage({
       return;
     }
 
-    // Note: EventSource requiert une API SSE. Pour l'instant, le streaming
-    // n'est pas implémenté côté backend. La réponse arrive en JSON complet.
-    // Si message.streamUrl existe, on tente quand même la connexion :
+
     if (message.streamUrl) {
       const eventSource = new EventSource(message.streamUrl);
 
@@ -151,9 +149,7 @@ function BugsAlert({ bugs }) {
             🔍 {stats.total} hardware issue(s) detected
           </h4>
           <div className="space-y-1 text-sm">
-            {stats.critical > 0 && (
-              <div className="text-red-700">❌ {stats.critical} critical</div>
-            )}
+            {stats.critical > 0 && <div className="text-red-700">❌ {stats.critical} critical</div>}
             {stats.warnings > 0 && (
               <div className="text-yellow-700">⚠️ {stats.warnings}warning(s)</div>
             )}

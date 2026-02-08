@@ -9,9 +9,9 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
     setStatus("loading");
 
     try {
-      const response = await fetch('/api/github/commit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/github/commit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           repoUrl: githubUrl,
           content: documentationContent,
@@ -25,8 +25,8 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
         setTimeout(() => setStatus("idle"), 3000);
       } else {
         const error = await response.json();
-        console.error('GitHub error:', error);
-        throw new Error(error.error || 'Failed to send');
+        console.error("GitHub error:", error);
+        throw new Error(error.error || "Failed to send");
       }
     } catch (error) {
       console.error("GitHub Error:", error);
@@ -107,14 +107,14 @@ export default function GithubDocButton({ githubUrl, documentationContent, onSuc
       >
         {getButtonContent()}
       </button>
-      
-      {status === 'success' && (
+
+      {status === "success" && (
         <p className="text-xs text-green-400 bg-green-900/30 px-3 py-1.5 rounded border border-green-700">
           ✓ File CIRCUIT_DOCUMENTATION.md created in your repo
         </p>
       )}
-      
-      {status === 'error' && (
+
+      {status === "error" && (
         <p className="text-xs text-red-400 bg-red-900/30 px-3 py-1.5 rounded border border-red-700">
           ❌ Error: Check that GITHUB_TOKEN is configured in .env.local
         </p>

@@ -242,10 +242,10 @@ function parseShoppingResponse(responseText, originalComponents) {
     return items.map((item) => ({
       component: item.component || "Unknown",
       price_usd: item.price_usd || "Check manually",
-      vendors: (item.vendors || []).slice(0, 3).map(v => ({
+      vendors: (item.vendors || []).slice(0, 3).map((v) => ({
         name: v.name || "Vendor",
         price: v.price || item.price_usd || "N/A",
-        url: v.url || `https://www.google.com/search?q=${encodeURIComponent(item.component)}`
+        url: v.url || `https://www.google.com/search?q=${encodeURIComponent(item.component)}`,
       })),
       alternatives: item.alternatives || getDefaultAlternatives(item.component),
     }));
@@ -260,72 +260,104 @@ function parseShoppingResponse(responseText, originalComponents) {
  */
 function getFallbackPrices(components) {
   const fallbackPrices = {
-    ESP32: { 
-      price: "6.99", 
+    ESP32: {
+      price: "6.99",
       vendors: [
         { name: "Amazon", price: "6.99", url: "https://amazon.com/s?k=ESP32" },
-        { name: "AliExpress", price: "4.50", url: "https://aliexpress.com/wholesale?SearchText=ESP32" }
-      ]
+        {
+          name: "AliExpress",
+          price: "4.50",
+          url: "https://aliexpress.com/wholesale?SearchText=ESP32",
+        },
+      ],
     },
-    DHT22: { 
-      price: "4.99", 
+    DHT22: {
+      price: "4.99",
       vendors: [
         { name: "Amazon", price: "4.99", url: "https://amazon.com/s?k=DHT22" },
-        { name: "AliExpress", price: "2.50", url: "https://aliexpress.com/wholesale?SearchText=DHT22" }
-      ]
+        {
+          name: "AliExpress",
+          price: "2.50",
+          url: "https://aliexpress.com/wholesale?SearchText=DHT22",
+        },
+      ],
     },
-    "OLED SSD1306": { 
-      price: "5.99", 
+    "OLED SSD1306": {
+      price: "5.99",
       vendors: [
         { name: "Amazon", price: "5.99", url: "https://amazon.com/s?k=OLED+SSD1306" },
-        { name: "AliExpress", price: "3.50", url: "https://aliexpress.com/wholesale?SearchText=OLED" }
-      ]
+        {
+          name: "AliExpress",
+          price: "3.50",
+          url: "https://aliexpress.com/wholesale?SearchText=OLED",
+        },
+      ],
     },
-    "HC-SR04": { 
-      price: "3.99", 
+    "HC-SR04": {
+      price: "3.99",
       vendors: [
         { name: "Amazon", price: "3.99", url: "https://amazon.com/s?k=HC-SR04" },
-        { name: "AliExpress", price: "1.50", url: "https://aliexpress.com/wholesale?SearchText=HC-SR04" }
-      ]
+        {
+          name: "AliExpress",
+          price: "1.50",
+          url: "https://aliexpress.com/wholesale?SearchText=HC-SR04",
+        },
+      ],
     },
-    "Servo Motor": { 
-      price: "4.99", 
+    "Servo Motor": {
+      price: "4.99",
       vendors: [
         { name: "Amazon", price: "4.99", url: "https://amazon.com/s?k=SG90+Servo" },
-        { name: "AliExpress", price: "2.00", url: "https://aliexpress.com/wholesale?SearchText=SG90" }
-      ]
+        {
+          name: "AliExpress",
+          price: "2.00",
+          url: "https://aliexpress.com/wholesale?SearchText=SG90",
+        },
+      ],
     },
-    BMP280: { 
-      price: "4.49", 
+    BMP280: {
+      price: "4.49",
       vendors: [
         { name: "Amazon", price: "4.49", url: "https://amazon.com/s?k=BMP280" },
-        { name: "Mouser", price: "5.20", url: "https://mouser.com/c/?q=BMP280" }
-      ]
+        { name: "Mouser", price: "5.20", url: "https://mouser.com/c/?q=BMP280" },
+      ],
     },
-    MPU6050: { 
-      price: "5.99", 
+    MPU6050: {
+      price: "5.99",
       vendors: [
         { name: "Amazon", price: "5.99", url: "https://amazon.com/s?k=MPU6050" },
-        { name: "AliExpress", price: "3.00", url: "https://aliexpress.com/wholesale?SearchText=MPU6050" }
-      ]
+        {
+          name: "AliExpress",
+          price: "3.00",
+          url: "https://aliexpress.com/wholesale?SearchText=MPU6050",
+        },
+      ],
     },
-    L298N: { 
-      price: "7.99", 
+    L298N: {
+      price: "7.99",
       vendors: [
         { name: "Amazon", price: "7.99", url: "https://amazon.com/s?k=L298N" },
-        { name: "AliExpress", price: "4.50", url: "https://aliexpress.com/wholesale?SearchText=L298N" }
-      ]
+        {
+          name: "AliExpress",
+          price: "4.50",
+          url: "https://aliexpress.com/wholesale?SearchText=L298N",
+        },
+      ],
     },
   };
 
   const items = components.map((comp) => {
-    const fallback = fallbackPrices[comp] || { 
-      price: "Check manually", 
+    const fallback = fallbackPrices[comp] || {
+      price: "Check manually",
       vendors: [
-        { name: "Google", price: "N/A", url: `https://www.google.com/search?q=${encodeURIComponent(comp + " price")}` }
-      ]
+        {
+          name: "Google",
+          price: "N/A",
+          url: `https://www.google.com/search?q=${encodeURIComponent(comp + " price")}`,
+        },
+      ],
     };
-    
+
     return {
       component: comp,
       price_usd: fallback.price,
@@ -337,7 +369,7 @@ function getFallbackPrices(components) {
   return {
     success: false,
     items: items,
-    error: "Using fallback prices"
+    error: "Using fallback prices",
   };
 }
 
@@ -373,9 +405,10 @@ export function generateShoppingMarkdown(items, language = "en") {
   const priceHeader = language === "fr" ? "Prix (USD)" : "Price (USD)";
   const linksHeader = language === "fr" ? "Liens d'Achat" : "Purchase Links";
   const altsHeader = language === "fr" ? "Alternatives" : "Alternatives";
-  const note = language === "fr" 
-    ? "> 💡 Prix indicatifs trouvés via Google Search - vérifiez la disponibilité et les frais de port"
-    : "> 💡 Prices found via Google Search - check availability and shipping costs";
+  const note =
+    language === "fr"
+      ? "> 💡 Prix indicatifs trouvés via Google Search - vérifiez la disponibilité et les frais de port"
+      : "> 💡 Prices found via Google Search - check availability and shipping costs";
 
   let markdown = `${title}\n\n`;
   markdown += `| ${componentHeader} | ${priceHeader} | ${linksHeader} | ${altsHeader} |\n`;
@@ -390,12 +423,15 @@ export function generateShoppingMarkdown(items, language = "en") {
     }
 
     // ✅ CORRECTED: Format purchase links properly with prices
-    const links = item.vendors && item.vendors.length > 0
-      ? item.vendors
-          .slice(0, 2)
-          .map((v) => `[${v.name} ($${v.price})](${v.url})`)
-          .join(" • ")
-      : "🔍 [Search](https://www.google.com/search?q=" + encodeURIComponent(item.component + " buy") + ")";
+    const links =
+      item.vendors && item.vendors.length > 0
+        ? item.vendors
+            .slice(0, 2)
+            .map((v) => `[${v.name} ($${v.price})](${v.url})`)
+            .join(" • ")
+        : "🔍 [Search](https://www.google.com/search?q=" +
+          encodeURIComponent(item.component + " buy") +
+          ")";
 
     const alts = item.alternatives?.slice(0, 2).join(", ") || "-";
 
@@ -451,7 +487,9 @@ export async function generateShoppingList(codeSource, language = "en", useGoogl
       }, 0)
       .toFixed(2);
 
-    console.log(`✅ Shopping list generated: ${shoppingItems.length} items, $${totalEstimate} total`);
+    console.log(
+      `✅ Shopping list generated: ${shoppingItems.length} items, $${totalEstimate} total`
+    );
 
     return {
       success: true,

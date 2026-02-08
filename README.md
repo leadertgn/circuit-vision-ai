@@ -32,19 +32,20 @@ Hardware engineers waste **2-3 hours per project** on tedious documentation:
 ---
 
 ## ⚡ How It Works
+
 ```bash
 1. Paste GitHub URL  →  2. AI Analysis (25s)  →  3. Complete Documentation
 ```
 
 ### What You Get Automatically:
 
-| Feature | Description |
-|---------|-------------|
-| 📋 **Technical Docs** | 8-section structured documentation |
-| 🐛 **Bug Detection** | Hardware issues (voltage, pins, timing) |
-| 📊 **Wiring Diagrams** | Auto-generated Mermaid flowcharts |
-| 🛒 **Shopping Lists** | Components with real prices & links |
-| 🔗 **GitHub Integration** | One-click commit to your repo |
+| Feature                   | Description                             |
+| ------------------------- | --------------------------------------- |
+| 📋 **Technical Docs**     | 8-section structured documentation      |
+| 🐛 **Bug Detection**      | Hardware issues (voltage, pins, timing) |
+| 📊 **Wiring Diagrams**    | Auto-generated Mermaid flowcharts       |
+| 🛒 **Shopping Lists**     | Components with real prices & links     |
+| 🔗 **GitHub Integration** | One-click commit to your repo           |
 
 ---
 
@@ -52,20 +53,20 @@ Hardware engineers waste **2-3 hours per project** on tedious documentation:
 
 ### Measurable Impact
 
-| Metric | Value | vs Manual |
-|--------|-------|-----------|
-| ⏱️ **Documentation Time** | 25 seconds | 2.5 hours |
-| 🐛 **Bug Detection** | 95% accuracy | 0% (manual miss) |
-| 💰 **Value Per Project** | $125 saved | - |
-| 🎯 **Platforms Supported** | 6 types | 1-2 typically |
-| 📈 **Adoption** | 250+ hours saved | - |
+| Metric                     | Value            | vs Manual        |
+| -------------------------- | ---------------- | ---------------- |
+| ⏱️ **Documentation Time**  | 25 seconds       | 2.5 hours        |
+| 🐛 **Bug Detection**       | 95% accuracy     | 0% (manual miss) |
+| 💰 **Value Per Project**   | $125 saved       | -                |
+| 🎯 **Platforms Supported** | 6 types          | 1-2 typically    |
+| 📈 **Adoption**            | 250+ hours saved | -                |
 
 ### Unique Differentiators
 
 ✅ **Only tool** that combines code analysis + bug detection + GitHub push  
 ✅ **Broad platform support**: Arduino, ESP32, Raspberry Pi, STM32, FPGA, KiCad  
 ✅ **Production-ready**: Live at [circuitvision.vercel.app](https://circuitvision.vercel.app)  
-✅ **Real-world validated**: 95% bug detection accuracy  
+✅ **Real-world validated**: 95% bug detection accuracy
 
 ---
 
@@ -74,6 +75,7 @@ Hardware engineers waste **2-3 hours per project** on tedious documentation:
 ### 1️⃣ Intelligent GitHub Scanner
 
 Automatically detects and adapts to:
+
 - **Arduino** classic projects (`sketch.ino`)
 - **PlatformIO** ESP32/ESP8266 (`platformio.ini`)
 - **Raspberry Pi** Python GPIO (`RPi.GPIO`)
@@ -85,13 +87,13 @@ Automatically detects and adapts to:
 
 Catches critical issues automatically:
 
-| Bug Type | Example | Severity |
-|----------|---------|----------|
-| ❌ **Pin Conflicts** | GPIO6 used for LED and DHT22 | Critical |
-| ❌ **Voltage Mismatch** | 5V to 3.3V sensor | Critical |
-| ⚠️ **I2C/SPI Conflicts** | Default pins reassigned | Warning |
-| ⚠️ **Timing Issues** | DHT22 read interval < 2s | Warning |
-| ℹ️ **Security** | Hardcoded WiFi passwords | Info |
+| Bug Type                 | Example                      | Severity |
+| ------------------------ | ---------------------------- | -------- |
+| ❌ **Pin Conflicts**     | GPIO6 used for LED and DHT22 | Critical |
+| ❌ **Voltage Mismatch**  | 5V to 3.3V sensor            | Critical |
+| ⚠️ **I2C/SPI Conflicts** | Default pins reassigned      | Warning  |
+| ⚠️ **Timing Issues**     | DHT22 read interval < 2s     | Warning  |
+| ℹ️ **Security**          | Hardcoded WiFi passwords     | Info     |
 
 ### 3️⃣ Smart Shopping Lists (Gemini 3 Google Search)
 
@@ -101,6 +103,7 @@ Catches critical issues automatically:
 - Suggests compatible alternatives
 
 ### 4️⃣ GitHub Auto-Commit
+
 ```bash
 # CircuitVision creates this file in your repo:
 CIRCUIT_DOCUMENTATION.md
@@ -118,6 +121,7 @@ No manual copy-paste. One click, done.
 [![Watch Demo on YouTube](./public/video-thumbnail.jpg)](https://youtube.com/watch?v=xxx)
 
 **What the demo shows:**
+
 1. **Problem** (0:00-0:20): Manual documentation nightmare
 2. **Solution** (0:20-1:30): Paste URL → instant docs
 3. **Bug Detection** (1:30-2:00): 3 critical issues found
@@ -129,23 +133,27 @@ No manual copy-paste. One click, done.
 ## 🛠️ Tech Stack
 
 ### AI & Analysis
+
 - **Google Gemini 3 Flash** (Structured Outputs + Google Search)
 - **Gemini 3 Pro** (Fallback for complex repos)
 - **Custom validation**: Hardware bug detection, Mermaid syntax
 
 ### Frontend
+
 - **Next.js 14** (App Router, Server Components)
 - **React 19** (Suspense, Streaming)
 - **TailwindCSS 4** (Styling)
 - **Mermaid.js** (Diagram rendering)
 
 ### Backend & Data
+
 - **Next.js API Routes** (Server-side processing)
 - **Firebase Firestore** (Conversation storage)
 - **Octokit** (GitHub API integration)
 - **Cloudinary** (Image/video uploads)
 
 ### Deployment
+
 - **Vercel** (Production hosting)
 - **GitHub Actions** (CI/CD - optional)
 
@@ -154,12 +162,14 @@ No manual copy-paste. One click, done.
 ## 📦 Quick Start
 
 ### Prerequisites
+
 ```bash
 Node.js 18+
 Git
 ```
 
 ### Installation
+
 ```bash
 # Clone repository
 git clone https://github.com/yourusername/circuitvision-ai.git
@@ -175,6 +185,7 @@ cp .env.example .env.local
 ### Environment Variables
 
 Create `.env.local` with:
+
 ```env
 # Required
 GEMINI_API_KEY=your_gemini_api_key_here
@@ -195,12 +206,14 @@ CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 ### Run Development Server
+
 ```bash
 npm run dev
 # Open http://localhost:3000
 ```
 
 ### Build for Production
+
 ```bash
 npm run build
 npm start
@@ -210,19 +223,20 @@ npm start
 
 ## 🎯 Use Cases
 
-| User Type | Pain Point | CircuitVision Solution |
-|-----------|-----------|------------------------|
-| **Maker** | Sharing projects on GitHub without docs | Auto-generated README |
-| **Student** | Lab report documentation (3+ hours) | 25 seconds → focus on learning |
-| **Engineer** | Code review prep + bug hunting | Instant analysis + bug report |
-| **Teacher** | Grading 50 student projects | Batch analyze repos |
-| **Company** | Onboarding juniors on legacy code | Auto-docs for old projects |
+| User Type    | Pain Point                              | CircuitVision Solution         |
+| ------------ | --------------------------------------- | ------------------------------ |
+| **Maker**    | Sharing projects on GitHub without docs | Auto-generated README          |
+| **Student**  | Lab report documentation (3+ hours)     | 25 seconds → focus on learning |
+| **Engineer** | Code review prep + bug hunting          | Instant analysis + bug report  |
+| **Teacher**  | Grading 50 student projects             | Batch analyze repos            |
+| **Company**  | Onboarding juniors on legacy code       | Auto-docs for old projects     |
 
 ---
 
 ## 📊 Real-World Metrics
 
 **From our beta users:**
+
 ```
 📈 250+ hours saved in December 2025
 💰 $12,500 in consulting value created
@@ -236,6 +250,7 @@ npm start
 ## 🏅 Hackathon Highlights
 
 ### Technical Execution (40%)
+
 - ✅ **Gemini 3 Structured Outputs**: JSON schema validation
 - ✅ **Google Search Integration**: Real-time component pricing
 - ✅ **Multi-model fallback**: Flash → Pro → Flash-Lite
@@ -243,17 +258,20 @@ npm start
 - ✅ **Custom validators**: Mermaid syntax, hardware rules
 
 ### Innovation (30%)
+
 - 🆕 **Industry-first**: Hardware bug detection via LLM
 - 🆕 **Multi-platform**: 6 platforms (Arduino → FPGA)
 - 🆕 **End-to-end workflow**: Scan → Analyze → Commit
 - 🆕 **Shopping automation**: Prices via Google Search
 
 ### Impact (20%)
+
 - 💼 **Measurable ROI**: $125 saved per project
 - 🌍 **Broad market**: 10M+ hardware developers globally
 - 📈 **Proven adoption**: 250+ hours saved in beta
 
 ### Presentation (10%)
+
 - 🎬 **Professional demo**: 3-minute video
 - 📚 **Complete docs**: README + architecture diagrams
 - 🚀 **Live deployment**: circuitvision.vercel.app
@@ -261,6 +279,7 @@ npm start
 ---
 
 ## 🗂️ Project Structure
+
 ```
 circuitvision-ai/
 ├── src/
@@ -296,6 +315,7 @@ circuitvision-ai/
 ---
 
 ## 🧪 Testing
+
 ```bash
 # Run tests (optional)
 npm test
@@ -311,6 +331,7 @@ npm test
 ## 🤝 Contributing
 
 This is a hackathon project, but contributions welcome!
+
 ```bash
 # Fork the repo
 # Create feature branch
