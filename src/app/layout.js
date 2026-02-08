@@ -13,7 +13,8 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "CircuitVision AI - Automated Hardware Documentation | Gemini 2.5",
-  description: "Generate complete technical documentation, detect hardware bugs, and create shopping lists in under 30 seconds with Gemini 2.5. Save 95% of your time on embedded projects.",
+  description:
+    "Generate complete technical documentation, detect hardware bugs, and create shopping lists in under 30 seconds with Gemini 2.5. Save 95% of your time on embedded projects.",
   keywords: [
     "circuit documentation",
     "hardware analysis",
@@ -26,7 +27,7 @@ export const metadata = {
     "AI documentation",
     "IoT",
     "electronics",
-    "PCB design"
+    "PCB design",
   ].join(", "),
   authors: [{ name: "CircuitVision AI Team" }],
   creator: "CircuitVision AI",
@@ -76,17 +77,17 @@ export default function RootLayout({ children }) {
         {/* Preconnect for optimized loading */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        
+
         {/* Favicon */}
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        
+
         {/* Theme color */}
         <meta name="theme-color" content="#3B82F6" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
-        
+
         {/* Google Analytics (optional - uncomment and add your ID) */}
         {/* <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"

@@ -34,8 +34,8 @@ export async function POST(req) {
       // Si le titre a déjà été personnalisé et n'est pas un titre temporaire, ne pas le regénérer
       if (
         existingTitle &&
-        existingTitle !== "Nouvelle conversation" &&
-        existingTitle !== "Analyse Circuit"
+        existingTitle !== "New Conversation" &&
+        existingTitle !== "Circuit Analysis"
       ) {
         console.log("Titre déjà existant:", existingTitle);
         return NextResponse.json({ title: existingTitle });

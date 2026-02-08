@@ -17,52 +17,14 @@ import {
 import { getSessionId } from "@/lib/session";
 import { useGithubDocButton } from "@/hooks/useGithubDocButton";
 import { useLanguage } from "@/hooks/useLanguage";
-import { extractComponentsFromCode } from "@/lib/component-search";
 
 // Components
 import { ConversationList } from "@/components/sidebar/ConversationList";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatInput } from "@/components/chat/ChatInput";
-import StreamingMessage from "@/components/StreamingMessage";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import WokwiSimulator from "@/components/WokwiSimulator";
-import GithubDocButton from "@/components/GithubDocButton";
 
-// Constants
-const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/ddn3wpmgi/image/upload`;
-const UPLOAD_PRESET = "circuit_vision";
-
-// Helper: Upload to Cloudinary
-const uploadToCloudinary = async (base64File, fileType) => {
-  try {
-    const isVideo = fileType?.startsWith("video");
-    const resourceType = isVideo ? "video" : "image";
-    const url = `${CLOUDINARY_URL}/${resourceType}/upload`;
-
-    console.log("Cloudinary: Uploading to", url, "with preset", UPLOAD_PRESET);
-
-    const formData = new FormData();
-    formData.append("file", base64File);
-    formData.append("upload_preset", UPLOAD_PRESET);
-
-    const res = await fetch(url, { method: "POST", body: formData });
-
-    console.log("Cloudinary response status:", res.status, res.statusText);
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Cloudinary upload failed:", res.status, res.statusText, errorText);
-      return null;
-    }
-
-    const data = await res.json();
-    console.log("Cloudinary upload success:", data.secure_url);
-    return data.secure_url;
-  } catch (err) {
-    console.error("Cloudinary Error:", err);
-    return null;
-  }
-};
 
 // Helper: Process file
 const processFile = (file, callback) => {
@@ -99,7 +61,32 @@ const processFile = (file, callback) => {
   };
   reader.readAsDataURL(file);
 };
+// ✅ Helper function pour extraire composants (ajouter ligne ~110)
+function extractComponentsForSimulator(markdown) {
+  const tableRegex = /\|\s*([^|]+)\s*\|\s*(GPIO\d+|D\d+|A\d+|Pin\s*\d+)\s*\|/gi;
+  const components = [];
+  let match;
 
+  while ((match = tableRegex.exec(markdown)) !== null) {
+    const componentName = match[1].trim();
+    const pinName = match[2].trim();
+
+    // Skip header row
+    if (
+      componentName.toLowerCase().includes("component") ||
+      componentName.toLowerCase().includes("composant")
+    ) {
+      continue;
+    }
+
+    components.push({
+      component: componentName,
+      pin: pinName,
+    });
+  }
+
+  return components.slice(0, 10); // Max 10 for Wokwi
+}
 export default function Home() {
   // States
   const [messages, setMessages] = useState([]);
@@ -120,16 +107,9 @@ export default function Home() {
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [simulatorData, setSimulatorData] = useState(null);
 
-  const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
   const sessionId = getSessionId();
 
-  // Hooks
-  const { shouldShowButton, githubUrl, documentationContent } = useGithubDocButton(
-    messages,
-    activeChatId
-  );
-  
   // Language detection hook
   const { language: userLanguage, isLoading: langLoading } = useLanguage();
 
@@ -160,6 +140,23 @@ export default function Home() {
     });
   }, [activeChatId]);
 
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    // Check if simulator data exists in last message
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "assistant" && lastMessage?.arduinoCode) {
+      const components = extractComponentsForSimulator(lastMessage.text);
+      if (components.length > 0) {
+        setSimulatorData({
+          code: lastMessage.arduinoCode,
+          components: components,
+          connections: [],
+        });
+        setShowSimulator(true);
+      }
+    }
+  }, [messages, activeChatId]);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -368,11 +365,11 @@ export default function Home() {
                 });
               }
 
-              // Bugs détectés
+              // Bugs détected
               if (data.bugs && data.bugs.length > 0) {
                 bugsData = data;
                 console.log("🐛 Bugs détectés:", data.bugs.length);
-                // Afficher notification ou badge
+              
               }
 
               // Shopping list
@@ -381,7 +378,6 @@ export default function Home() {
                 console.log("🛒 Components:", data.items.length);
               }
             } catch (e) {
-              // Ignorer les lignes invalides
               if (line.trim() !== "") {
                 console.warn("⚠️ Parse error:", e.message);
               }
@@ -418,7 +414,7 @@ export default function Home() {
           "// Arduino code will appear here\n\nvoid setup() {\n  // Your code here\n}\n\nvoid loop() {\n  // Your code here\n}";
 
         setSimulatorData({
-          code: arduinoCode, // Code Arduino pur, pas le markdown!
+          code: arduinoCode, 
           components: shoppingData.items.map((item) => ({
             component: item.component,
             pin: "GPIO" + Math.floor(Math.random() * 30),
@@ -592,18 +588,16 @@ export default function Home() {
           )}
         </div>
 
-        {/* Simulator */}
+        {/* Simulator - CORRECTED VERSION with persistence */}
         {showSimulator && simulatorData && (
-          <div className="border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm p-4">
-            <div className="max-w-4xl mx-auto">
-              <WokwiSimulator
-                code={simulatorData.code}
-                components={simulatorData.components}
-                onSimulationStart={() => {}}
-                onSimulationStop={() => {}}
-              />
-            </div>
-          </div>
+          <WokwiSimulator
+            code={simulatorData.code}
+            components={simulatorData.components}
+            connections={simulatorData.connections || []}
+            chatId={activeChatId} // ✅ NEW: Pass chatId for persistence
+            onSimulationStart={() => console.log("Simulation started")}
+            onSimulationStop={() => console.log("Simulation stopped")}
+          />
         )}
 
         {/* Input Area */}

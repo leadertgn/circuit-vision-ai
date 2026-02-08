@@ -6,7 +6,7 @@
  */
 export function isDocumentationComplete(aiResponse) {
   if (!aiResponse || aiResponse.length < 800) return false;
-  
+
   // Sections obligatoires (plus flexible dans la détection)
   const requiredSections = [
     /vue\s+d'ensemble|overview|présentation|objectif/i,
@@ -15,26 +15,26 @@ export function isDocumentationComplete(aiResponse) {
     /bibliothèques?|dépendances|libraries/i,
     /installation|procédure|setup/i,
   ];
-  
+
   // Compter combien de sections requises sont présentes
-  const matchCount = requiredSections.filter(regex => regex.test(aiResponse)).length;
-  
+  const matchCount = requiredSections.filter((regex) => regex.test(aiResponse)).length;
+
   // Vérifier la présence d'un diagramme Mermaid OU d'un schéma
   const hasMermaid = /```mermaid/i.test(aiResponse) || /schéma|diagram/i.test(aiResponse);
-  
+
   // Documentation complète = au moins 4 sections + diagramme/schéma
   const isComplete = matchCount >= 4 && hasMermaid;
-  
+
   // Log pour debugging
-  if (typeof console !== 'undefined') {
-    console.log('📊 Détection doc complète:', {
+  if (typeof console !== "undefined") {
+    console.log("📊 Détection doc complète:", {
       sections: matchCount,
       hasDiagram: hasMermaid,
       isComplete,
-      length: aiResponse.length
+      length: aiResponse.length,
     });
   }
-  
+
   return isComplete;
 }
 
@@ -51,12 +51,8 @@ export function extractGithubUrl(userInput) {
  */
 export function shouldShowGithubButton(aiResponse, userInput, hasGithubUrl) {
   // Ne pas afficher si continuation en cours
-  const isContinuation = userInput?.toLowerCase().includes('continue') ||
-                         userInput?.toLowerCase().includes('suite');
-  
-  return (
-    hasGithubUrl && 
-    isDocumentationComplete(aiResponse) &&
-    !isContinuation
-  );
+  const isContinuation =
+    userInput?.toLowerCase().includes("continue") || userInput?.toLowerCase().includes("suite");
+
+  return hasGithubUrl && isDocumentationComplete(aiResponse) && !isContinuation;
 }
