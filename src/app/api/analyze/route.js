@@ -484,6 +484,7 @@ export async function POST(req) {
 
               if (shoppingResult.success && shoppingResult.items) {
                 // ✅ CORRECTED: Use proper markdown generation with links
+                const { generateShoppingMarkdown } = await import("@/lib/component-search");
                 const shoppingMarkdown = generateShoppingMarkdown(
                   shoppingResult.items,
                   userLanguage
@@ -553,7 +554,7 @@ export async function POST(req) {
         return null;
       }
     }
-    // ✅ HELPER FUNCTION: Calculate total (add after line ~270)
+    // ✅ HELPER FUNCTION: Calculate total
     function calculateTotal(items) {
       if (!items || items.length === 0) return "0.00";
       const sum = items.reduce((acc, item) => {
@@ -562,6 +563,7 @@ export async function POST(req) {
       }, 0);
       return sum.toFixed(2);
     }
+
     // MODE COMPARAISON
     if (isCompare) {
       if (referenceFiles?.length > 0) {

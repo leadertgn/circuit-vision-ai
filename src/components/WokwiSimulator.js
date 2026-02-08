@@ -13,36 +13,11 @@ import {
 } from "lucide-react";
 
 /**
- * Wokwi Circuit Simulator Integration - CORRECTED VERSION
- * - Dynamic URL based on platform
- * - Warning for unsupported platforms
- * - Unique simulation per conversation
+ * Wokwi Circuit Simulator Integration - FINAL CORRECTED VERSION
+ * ✅ Dynamic Wokwi URL based on detected platform
+ * ✅ Proper ESP8266 vs ESP32 detection priority
+ * ✅ All platforms supported
  */
-
-// Platform to Wokwi URL mapping
-const wokwiPlatformUrls = {
-  "Arduino Uno": "https://wokwi.com/arduino/new",
-  "Arduino Nano": "https://wokwi.com/arduino-nano/new",
-  "Arduino Mega": "https://wokwi.com/arduino-mega/new",
-  ESP32: "https://wokwi.com/esp32/new",
-  STM32: "https://wokwi.com/stm32/new",
-  "Raspberry Pi Pico": "https://wokwi.com/pico/new",
-};
-
-// Unsupported platforms
-const unsupportedPlatforms = ["ESP8266"];
-
-// Helper function to get Wokwi URL based on platform
-function getWokwiUrl(platform, code) {
-  const baseUrl = wokwiPlatformUrls[platform] || wokwiPlatformUrls["Arduino Uno"];
-  const encodedCode = encodeURIComponent(code);
-  return `${baseUrl}?code=${encodedCode}`;
-}
-
-// Helper function to check if platform is supported
-function isPlatformSupported(platform) {
-  return wokwiPlatformUrls.hasOwnProperty(platform) && !unsupportedPlatforms.includes(platform);
-}
 
 // Helper function to map components to Wokwi parts
 function mapComponentsToWokwiParts(components) {
@@ -107,47 +82,85 @@ function mapToWokwiConnections(connections) {
 }
 
 /**
- * ✅ IMPROVED: Detect platform from code automatically
+ * ✅ FINAL CORRECTED: Detect platform with proper priority
+ * ESP8266 MUST be checked BEFORE ESP32 to avoid false positives
  */
 function detectPlatformFromCode(code, components) {
   const codeStr = code?.toLowerCase() || "";
 
-  // ESP32 detection
-  if (
-    codeStr.includes("esp32") ||
-    codeStr.includes("#include <wifi.h>") ||
-    codeStr.includes("esp_") ||
-    components.some((c) => c.component?.toLowerCase().includes("esp32"))
-  ) {
-    return "ESP32";
-  }
+  console.log("🔍 Platform detection started...");
+  console.log("📝 Code snippet:", codeStr.substring(0, 200));
 
-  // ESP8266 detection
+  // ✅ PRIORITY 1: ESP8266 detection (MUST come before ESP32!)
   if (
     codeStr.includes("esp8266") ||
-    codeStr.includes("#include <esp8266") ||
+    codeStr.includes("#include <esp8266wifi.h>") ||
+    codeStr.includes("esp8266wifi") ||
+    codeStr.includes("platform = espressif8266") ||
     components.some((c) => c.component?.toLowerCase().includes("esp8266"))
   ) {
+    console.log("✅ Platform detected: ESP8266");
     return "ESP8266";
+  }
+
+  // ✅ PRIORITY 2: ESP32 detection (after ESP8266)
+  if (
+    codeStr.includes("esp32") ||
+    (codeStr.includes("#include <wifi.h>") && codeStr.includes("esp_")) ||
+    codeStr.includes("platform = espressif32") ||
+    components.some((c) => c.component?.toLowerCase().includes("esp32"))
+  ) {
+    console.log("✅ Platform detected: ESP32");
+    return "ESP32";
   }
 
   // Arduino Mega detection
   if (codeStr.includes("mega") || codeStr.includes("atmega2560")) {
+    console.log("✅ Platform detected: Arduino Mega");
     return "Arduino Mega";
   }
 
   // Arduino Nano detection
   if (codeStr.includes("nano") || codeStr.includes("atmega328p")) {
+    console.log("✅ Platform detected: Arduino Nano");
     return "Arduino Nano";
   }
 
   // Raspberry Pi Pico detection
   if (codeStr.includes("pico") || codeStr.includes("rp2040")) {
+    console.log("✅ Platform detected: Raspberry Pi Pico");
     return "Raspberry Pi Pico";
   }
 
   // Default: Arduino Uno
+  console.log("✅ Platform detected: Arduino Uno (default)");
   return "Arduino Uno";
+}
+
+/**
+ * ✅ NEW: Get proper Wokwi URL based on platform
+ */
+function getWokwiProjectUrl(platform, code) {
+  const encodedCode = encodeURIComponent(code);
+
+  // Map platform names to Wokwi project types
+  const wokwiPlatformMap = {
+    ESP8266: "esp8266",
+    ESP32: "esp32",
+    "Arduino Uno": "arduino-uno",
+    "Arduino Nano": "arduino-nano",
+    "Arduino Mega": "arduino-mega",
+    "Raspberry Pi Pico": "pi-pico",
+  };
+
+  const wokwiPlatform = wokwiPlatformMap[platform] || "arduino-uno";
+
+  // ✅ CORRECTED: Use proper Wokwi URL format
+  const url = `https://wokwi.com/projects/new/${wokwiPlatform}?code=${encodedCode}`;
+
+  console.log(`🔗 Wokwi URL generated for ${platform}: ${url.substring(0, 100)}...`);
+
+  return url;
 }
 
 export default function WokwiSimulator({
@@ -156,7 +169,7 @@ export default function WokwiSimulator({
   connections = [],
   onSimulationStart,
   onSimulationStop,
-  chatId, // ✅ NEW: For persistence
+  chatId,
 }) {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -165,7 +178,7 @@ export default function WokwiSimulator({
   const [error, setError] = useState(null);
   const [detectedPlatform, setDetectedPlatform] = useState("Arduino Uno");
 
-  // ✅ NEW: Persist simulator state in localStorage
+  // Persist simulator state in localStorage
   useEffect(() => {
     if (chatId && typeof window !== "undefined") {
       const savedState = localStorage.getItem(`simulator_${chatId}`);
@@ -180,7 +193,7 @@ export default function WokwiSimulator({
     }
   }, [chatId]);
 
-  // ✅ NEW: Save state when collapsed changes
+  // Save state when collapsed changes
   useEffect(() => {
     if (chatId && typeof window !== "undefined") {
       localStorage.setItem(
@@ -192,19 +205,19 @@ export default function WokwiSimulator({
     }
   }, [isCollapsed, chatId]);
 
-  // ✅ IMPROVED: Auto-detect platform from code
+  // ✅ CORRECTED: Auto-detect platform with proper priority
   useEffect(() => {
     if (code && components) {
       const platform = detectPlatformFromCode(code, components);
       setDetectedPlatform(platform);
-      console.log("🎯 Platform detected:", platform);
+      console.log("🎯 Final platform detected:", platform);
     }
   }, [code, components]);
 
   // Generate Wokwi configuration
   const generateWokwiConfig = useCallback(() => {
     if (!code || !code.trim()) {
-      setError("No Arduino code available for simulation");
+      setError("No code available for simulation");
       return;
     }
 
@@ -218,10 +231,10 @@ export default function WokwiSimulator({
 
     setWokwiConfig(config);
 
-    // Generate proper Wokwi URL for simulation
-    const projectUrl = getWokwiUrl(detectedPlatform, code);
+    // ✅ CORRECTED: Generate proper Wokwi URL based on detected platform
+    const projectUrl = getWokwiProjectUrl(detectedPlatform, code);
     setWokwiUrl(projectUrl);
-  }, [code, components, connections]);
+  }, [code, components, connections, detectedPlatform]);
 
   // Generate config when code or components change
   useEffect(() => {
@@ -243,8 +256,10 @@ export default function WokwiSimulator({
   // Open in Wokwi (new tab)
   const handleOpenInWokwi = () => {
     if (wokwiUrl) {
+      console.log("🚀 Opening Wokwi:", wokwiUrl.substring(0, 100));
       window.open(wokwiUrl, "_blank");
     } else if (wokwiConfig) {
+      // Fallback: download config
       const blob = new Blob([JSON.stringify(wokwiConfig, null, 2)], {
         type: "application/json",
       });
@@ -256,16 +271,16 @@ export default function WokwiSimulator({
     }
   };
 
-  // ✅ NEW: Close/Remove simulator
+  // Close/Remove simulator
   const handleClose = () => {
     setIsCollapsed(true);
   };
 
   if (!code || components.length === 0) {
-    return null; // Don't render if no data
+    return null;
   }
 
-  // ✅ NEW: Collapsed state
+  // Collapsed state
   if (isCollapsed) {
     return (
       <div className="border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm p-3">
@@ -289,7 +304,7 @@ export default function WokwiSimulator({
   return (
     <div className="border-t border-gray-800 bg-gray-900/95 backdrop-blur-sm p-4">
       <div className="max-w-4xl mx-auto space-y-4">
-        {/* ✅ NEW: Header with collapse/close buttons */}
+        {/* Header with collapse/close buttons */}
         <div className="flex items-center justify-between bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-600 rounded-lg">
@@ -332,7 +347,6 @@ export default function WokwiSimulator({
               Open in Wokwi
             </button>
 
-            {/* ✅ NEW: Collapse button */}
             <button
               onClick={() => setIsCollapsed(true)}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -341,7 +355,6 @@ export default function WokwiSimulator({
               <ChevronDown className="w-5 h-5" />
             </button>
 
-            {/* ✅ NEW: Close button */}
             <button
               onClick={handleClose}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
@@ -396,7 +409,7 @@ export default function WokwiSimulator({
         <div className="bg-gray-900 rounded-lg p-4 overflow-hidden">
           <p className="text-sm text-gray-400 mb-2 flex items-center gap-2">
             <Code className="w-4 h-4" />
-            Arduino Code Preview
+            {detectedPlatform} Code Preview
           </p>
           <pre className="text-xs text-green-400 overflow-auto max-h-40 whitespace-pre-wrap">
             {code?.substring(0, 1000)}
@@ -496,7 +509,7 @@ function CircuitPreview({ components, connections, config, platform, onSimulate 
         <div className="bg-white rounded-lg shadow-lg p-6 text-center">
           <Play className="w-12 h-12 text-purple-600 mx-auto mb-2" />
           <p className="text-gray-900 font-semibold mb-1">Ready to simulate</p>
-          <p className="text-sm text-gray-600">Click "Simulate" to start</p>
+          <p className="text-sm text-gray-600">Platform: {platform}</p>
         </div>
       </button>
     </div>

@@ -25,7 +25,6 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import WokwiSimulator from "@/components/WokwiSimulator";
 
-
 // Helper: Process file
 const processFile = (file, callback) => {
   if (file.size > 20 * 1024 * 1024) {
@@ -157,6 +156,7 @@ export default function Home() {
       }
     }
   }, [messages, activeChatId]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -369,7 +369,6 @@ export default function Home() {
               if (data.bugs && data.bugs.length > 0) {
                 bugsData = data;
                 console.log("🐛 Bugs détectés:", data.bugs.length);
-              
               }
 
               // Shopping list
@@ -414,7 +413,7 @@ export default function Home() {
           "// Arduino code will appear here\n\nvoid setup() {\n  // Your code here\n}\n\nvoid loop() {\n  // Your code here\n}";
 
         setSimulatorData({
-          code: arduinoCode, 
+          code: arduinoCode,
           components: shoppingData.items.map((item) => ({
             component: item.component,
             pin: "GPIO" + Math.floor(Math.random() * 30),
