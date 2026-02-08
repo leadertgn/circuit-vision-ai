@@ -15,7 +15,6 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { getSessionId } from "@/lib/session";
-import { useGithubDocButton } from "@/hooks/useGithubDocButton";
 import { useLanguage } from "@/hooks/useLanguage";
 
 // Components

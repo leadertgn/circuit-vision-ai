@@ -9,7 +9,6 @@ import { analyzeHardwareCode } from "@/lib/hardware-validator";
 import {
   extractComponentsFromCode,
   searchComponentPrices,
-  generateShoppingMarkdown,
 } from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
 import { DocumentationSchema } from "@/lib/schemas";
