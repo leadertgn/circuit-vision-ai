@@ -24,7 +24,6 @@ export default function StreamingMessage({
       return;
     }
 
-
     if (message.streamUrl) {
       const eventSource = new EventSource(message.streamUrl);
 
