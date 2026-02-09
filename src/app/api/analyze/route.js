@@ -6,10 +6,7 @@ import { NextResponse } from "next/server";
 import { sanitizeMermaidCode } from "@/lib/mermaid-validator";
 import { extractGithubUrl } from "@/lib/doc-completion-detector";
 import { analyzeHardwareCode } from "@/lib/hardware-validator";
-import {
-  extractComponentsFromCode,
-  searchComponentPrices,
-} from "@/lib/component-search";
+import { extractComponentsFromCode, searchComponentPrices } from "@/lib/component-search";
 import { detectPlatformType } from "@/lib/platform-support";
 import { DocumentationSchema } from "@/lib/schemas";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -634,9 +631,9 @@ export async function POST(req) {
     const modelsToTry = [
       "gemini-3-flash-preview", //instable
       "gemini-3-pro-preview", //instable
+      "gemini-2.5-pro", // Stable + puissant
       "gemini-2.5-flash-lite", // Stable + Ã©conomique
       "gemini-2.5-flash", // Stable + rapide
-      "gemini-2.5-pro", // Stable + puissant
     ];
 
     const isRefinement = sessionId?.includes("refinement-");
