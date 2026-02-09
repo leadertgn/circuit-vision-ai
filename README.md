@@ -248,7 +248,7 @@ GITHUB_TOKEN=your_github_personal_access_token
 
 ## 🎥 Demo
 
-**📹 Demo Video**: [Watch the 3-minute demonstration](https://youtube.com/your-demo-video)
+**📹 Demo Video**: [Watch the 3-minute demonstration](https://youtu.be/d0TRnsBjc1g)
 
 The demo showcases:
 
