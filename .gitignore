@@ -52,3 +52,6 @@ clean.mjs
 # firebase
 .firebase
 firebase-debug.log
+
+firestore.indexes.json
+firestore.rules
