@@ -233,7 +233,7 @@ GITHUB_TOKEN=votre_token_acces_personnel_github
 
 ## 🎥 Démo
 
-**📹 Vidéo de démonstration** : [Regardez la démonstration de 3 minutes](https://youtube.com/votre-video-demo)
+**📹 Vidéo de démonstration** : [Regardez la démonstration de 3 minutes](https://youtu.be/d0TRnsBjc1g)
 
 La démo montre :
 - 00:00 - Détection de plateforme et analyse initiale
